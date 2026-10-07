@@ -1,0 +1,1243 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="description" content="A ground-level solar self-check for homeowners and on-site health check reports for technicians.">
+<meta name="theme-color" content="#12294D">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-title" content="Solar Check">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-180.png">
+<style>:root{color-scheme:light;padding:env(safe-area-inset-top,0px) 0 env(safe-area-inset-bottom,0px)}body{margin:0}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Solar Health Check</title>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf-lib/1.17.1/pdf-lib.min.js"></script>
+<style>
+/* Layout: one phone-width column of instrument-panel cards under a sticky header with a
+   two-way mode switch. Readings are set like a nameplate: condensed caps labels, mono values. */
+:root{
+  --bg:#EDF1F6; --surface:#FFFFFF; --sunk:#E2E8F0; --ink:#0D1A2B; --muted:#55657A; --line:#D0D9E4;
+  --accent:#1746C8; --accent-ink:#FFFFFF; --accent-soft:#E3EAFC;
+  --sun:#F2A900;
+  --good:#146F38; --good-soft:#DCF2E3; --warn:#8F5400; --warn-soft:#FBEDCF; --bad:#B3261E; --bad-soft:#FBE2DF;
+  --glass:#12294D; --glass-line:#2F4D80; --glass-ink:#F2F6FC; --glass-muted:#A9BBD6;
+  --shadow:0 1px 2px rgba(13,26,43,.06), 0 6px 18px rgba(13,26,43,.05);
+  --font-display:"Barlow Condensed","Arial Narrow",sans-serif;
+  --font-body:"Barlow",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --font-data:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#09111C; --surface:#121C2A; --sunk:#0D1622; --ink:#E7EDF5; --muted:#93A3B8; --line:#243347;
+    --accent:#7AA2FF; --accent-ink:#07122A; --accent-soft:#182847;
+    --sun:#FFC043;
+    --good:#5ED391; --good-soft:#11301F; --warn:#F3BA55; --warn-soft:#33270F; --bad:#FF8A80; --bad-soft:#3A1917;
+    --glass:#0E2140; --glass-line:#27416E; --glass-ink:#F2F6FC; --glass-muted:#9FB2CF;
+    --shadow:0 1px 2px rgba(0,0,0,.4);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#09111C; --surface:#121C2A; --sunk:#0D1622; --ink:#E7EDF5; --muted:#93A3B8; --line:#243347;
+  --accent:#7AA2FF; --accent-ink:#07122A; --accent-soft:#182847;
+  --sun:#FFC043;
+  --good:#5ED391; --good-soft:#11301F; --warn:#F3BA55; --warn-soft:#33270F; --bad:#FF8A80; --bad-soft:#3A1917;
+  --glass:#0E2140; --glass-line:#27416E; --glass-ink:#F2F6FC; --glass-muted:#9FB2CF;
+  --shadow:0 1px 2px rgba(0,0,0,.4);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--font-body);font-size:16px;line-height:1.45;-webkit-text-size-adjust:100%}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+h1,h2,h3,p{margin:0}
+.app{max-width:600px;margin-inline:auto;padding-inline:16px;padding-block:0 40px}
+
+/* header */
+.top{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--bg);padding-block:12px 10px;display:flex;flex-direction:column;gap:10px;margin-inline:-16px;padding-inline:16px;border-bottom:1px solid var(--line)}
+.top-row{display:flex;align-items:center;gap:10px}
+.brand{display:flex;align-items:center;gap:10px;min-width:0;flex:1}
+.mark{width:34px;height:34px;flex:none;border-radius:8px;background-color:var(--glass);
+  background-image:linear-gradient(var(--glass-line) 1px,transparent 1px),linear-gradient(90deg,var(--glass-line) 1px,transparent 1px);
+  background-size:11px 11px;background-position:-1px -1px;position:relative;overflow:hidden}
+.mark::after{content:"";position:absolute;right:-7px;top:-7px;width:20px;height:20px;border-radius:50%;background:var(--sun)}
+.brand-name{font-family:var(--font-display);font-weight:700;font-size:clamp(16px,4.7vw,22px);letter-spacing:.02em;text-transform:uppercase;line-height:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.icon-btn{border:1px solid var(--line);background:var(--surface);border-radius:8px;height:38px;padding:0 12px;font-weight:500;font-size:14px;flex:none}
+.modes{display:grid;grid-template-columns:1fr 1fr;background:var(--sunk);border-radius:9px;padding:3px;gap:3px}
+.modes button{border:0;background:transparent;border-radius:7px;padding:8px 6px;font-family:var(--font-display);font-weight:600;font-size:17px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.modes button[aria-pressed="true"]{background:var(--surface);color:var(--ink);box-shadow:var(--shadow)}
+
+main{display:flex;flex-direction:column;gap:14px;padding-top:16px}
+.stack{display:flex;flex-direction:column;gap:12px}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center}
+.row > .grow{flex:1;min-width:0}
+.between{justify-content:space-between}
+
+/* type */
+.eyebrow{font-family:var(--font-display);font-weight:600;font-size:14px;letter-spacing:.09em;text-transform:uppercase;color:var(--muted)}
+h1{font-family:var(--font-display);font-weight:700;font-size:30px;line-height:1.05;letter-spacing:.01em;text-wrap:balance}
+h2{font-family:var(--font-display);font-weight:600;font-size:21px;line-height:1.15;letter-spacing:.02em;text-wrap:balance}
+h3{font-weight:600;font-size:16px}
+.muted{color:var(--muted)}
+.small{font-size:14px}
+.data{font-family:var(--font-data);font-variant-numeric:tabular-nums}
+
+/* cards */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:12px}
+.hero{background-color:var(--glass);color:var(--glass-ink);border-radius:var(--r);padding:18px 16px 16px;display:flex;flex-direction:column;gap:14px;position:relative;overflow:hidden;
+  background-image:linear-gradient(var(--glass-line) 1px,transparent 1px),linear-gradient(90deg,var(--glass-line) 1px,transparent 1px);background-size:44px 44px;background-position:-1px -1px}
+.hero::before{content:"";position:absolute;right:-46px;top:-46px;width:130px;height:130px;border-radius:50%;background:var(--sun);opacity:.95}
+.hero > *{position:relative}
+.hero .eyebrow{color:var(--glass-muted);max-width:calc(100% - 84px)}
+.hero .big{font-family:var(--font-display);font-weight:700;font-size:38px;line-height:1;letter-spacing:.01em;max-width:calc(100% - 70px)}
+.hero .sub{color:var(--glass-muted);font-size:15px}
+.hero .btn.primary{background:var(--sun);color:#1B1300}
+.hero .btn.ghost{border-color:var(--glass-line);color:var(--glass-ink);background:rgba(255,255,255,.06)}
+
+.banner{border:1px dashed var(--line);border-radius:var(--r);padding:10px 12px;font-size:14px;color:var(--muted);background:var(--sunk);display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap}
+.banner strong{color:var(--ink);font-weight:600}
+
+/* buttons */
+.btn{border:1px solid var(--line);background:var(--surface);border-radius:9px;min-height:46px;padding:10px 16px;font-weight:600;font-size:16px;display:inline-flex;align-items:center;justify-content:center;gap:8px;text-decoration:none;color:var(--ink)}
+.btn.primary{background:var(--accent);border-color:transparent;color:var(--accent-ink)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--bad);border-color:var(--bad)}
+.btn.sm{min-height:36px;padding:6px 12px;font-size:14px}
+.btn.block{width:100%}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.linkish{background:none;border:0;padding:0;color:var(--accent);font-weight:600;text-decoration:underline;text-underline-offset:3px}
+
+/* status */
+.pill{display:inline-flex;align-items:center;gap:6px;border-radius:999px;padding:3px 10px 3px 8px;font-weight:600;font-size:13px;white-space:nowrap}
+.pill::before{content:"";width:8px;height:8px;border-radius:50%;background:currentColor}
+.pill.ok{background:var(--good-soft);color:var(--good)}
+.pill.attention{background:var(--warn-soft);color:var(--warn)}
+.pill.urgent{background:var(--bad-soft);color:var(--bad)}
+.pill.none{background:var(--sunk);color:var(--muted)}
+.pill.wrap{white-space:normal;border-radius:8px;align-items:flex-start;padding:5px 10px 5px 8px}
+.pill.wrap::before{flex:none;margin-top:5px}
+.verdict{border-radius:var(--r);padding:16px;display:flex;flex-direction:column;gap:6px;border:1px solid transparent}
+.verdict.ok{background:var(--good-soft);color:var(--good);border-color:var(--good)}
+.verdict.attention{background:var(--warn-soft);color:var(--warn);border-color:var(--warn)}
+.verdict.urgent{background:var(--bad-soft);color:var(--bad);border-color:var(--bad)}
+.verdict h1{color:inherit}
+.verdict p{color:var(--ink)}
+
+/* forms */
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field > span, .label{font-family:var(--font-display);font-weight:600;font-size:14px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.field small{color:var(--muted);font-size:13px}
+input[type=text],input[type=number],input[type=date],input[type=tel],input[type=email],select,textarea{
+  width:100%;min-width:0;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:16px;min-height:46px}
+textarea{min-height:88px;resize:vertical}
+input.num{font-family:var(--font-data)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.grid3{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
+@media (max-width:380px){.grid3{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.unit{position:relative}
+.unit input{padding-right:46px}
+.grid3 input{padding-left:9px}
+.grid3 .unit input{padding-right:24px}
+.grid3 .unit i{right:8px}
+.unit i{position:absolute;right:12px;top:50%;transform:translateY(-50%);font-style:normal;font-family:var(--font-data);font-size:13px;color:var(--muted);pointer-events:none}
+.chips{display:flex;flex-wrap:wrap;gap:6px}
+.chip{border:1px solid var(--line);background:var(--surface);border-radius:8px;padding:8px 12px;font-size:15px;font-weight:500;min-height:40px}
+.chip[aria-pressed="true"]{background:var(--accent-soft);border-color:var(--accent);color:var(--accent)}
+.chip.c-ok[aria-pressed="true"]{background:var(--good-soft);border-color:var(--good);color:var(--good)}
+.chip.c-issue[aria-pressed="true"]{background:var(--bad-soft);border-color:var(--bad);color:var(--bad)}
+.chip.c-warn[aria-pressed="true"]{background:var(--warn-soft);border-color:var(--warn);color:var(--warn)}
+.chip.c-na[aria-pressed="true"]{background:var(--sunk);border-color:var(--muted);color:var(--ink)}
+
+.q{display:flex;flex-direction:column;gap:8px;padding-block:12px;border-top:1px solid var(--line)}
+.q:first-child{border-top:0;padding-top:0}
+.q:last-child{padding-bottom:0}
+.q p.small{color:var(--muted)}
+
+/* progress + tabs */
+.steps{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;gap:4px}
+.steps i{height:5px;border-radius:3px;background:var(--line)}
+.steps i.on{background:var(--accent)}
+.tabs{display:flex;gap:4px;overflow-x:auto;margin-inline:-16px;padding-inline:16px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tabs button{flex:none;border:0;border-bottom:3px solid transparent;background:none;padding:8px 10px;font-family:var(--font-display);font-weight:600;font-size:17px;letter-spacing:.04em;text-transform:uppercase;color:var(--muted)}
+.tabs button[aria-selected="true"]{color:var(--ink);border-bottom-color:var(--accent)}
+
+/* readouts */
+.readouts{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:1px;background:var(--line);border:1px solid var(--line);border-radius:8px;overflow:hidden}
+.readouts.three{grid-template-columns:repeat(3,minmax(0,1fr))}
+.readout{background:var(--surface);padding:10px 12px;display:flex;flex-direction:column;gap:2px;min-width:0}
+.readout b{font-family:var(--font-data);font-weight:600;font-size:19px;font-variant-numeric:tabular-nums;overflow-wrap:anywhere}
+.readout span{font-family:var(--font-display);font-weight:600;font-size:13px;letter-spacing:.07em;text-transform:uppercase;color:var(--muted)}
+.readout em{font-style:normal;font-size:12px;color:var(--muted)}
+.meter{height:12px;border-radius:6px;background:var(--sunk);position:relative;overflow:hidden}
+.meter > i{position:absolute;inset:0 auto 0 0;border-radius:6px;background:var(--accent)}
+.meter.ok > i{background:var(--good)} .meter.attention > i{background:var(--warn)} .meter.urgent > i{background:var(--bad)}
+.ticks{display:flex;justify-content:space-between;font-family:var(--font-data);font-size:11px;color:var(--muted)}
+
+/* lists */
+.list{display:flex;flex-direction:column}
+.item{display:flex;align-items:center;gap:12px;padding:12px 0;border-top:1px solid var(--line);background:none;border-inline:0;border-bottom:0;text-align:left;width:100%}
+.item:first-child{border-top:0;padding-top:0}
+.item:last-child{padding-bottom:0}
+.item .grow{flex:1;min-width:0}
+.item .t{font-weight:600;overflow-wrap:anywhere}
+.item .s{font-size:14px;color:var(--muted);overflow-wrap:anywhere}
+.chev{color:var(--muted);font-family:var(--font-data)}
+ul.plain{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+ul.plain li{display:flex;gap:10px;align-items:flex-start}
+ul.plain li > i{flex:none;width:10px;height:10px;border-radius:50%;margin-top:7px;background:var(--muted)}
+ul.plain li.urgent > i{background:var(--bad)} ul.plain li.attention > i{background:var(--warn)} ul.plain li.ok > i{background:var(--good)}
+.safety{border-left:4px solid var(--sun);background:var(--sunk);border-radius:6px;padding:12px 14px;font-size:15px}
+.phone{font-family:var(--font-data);font-weight:600;font-size:22px;user-select:all;-webkit-user-select:all;overflow-wrap:anywhere}
+
+/* photos */
+.photos{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.ph{position:relative;aspect-ratio:1;border-radius:8px;overflow:hidden;background:var(--sunk);border:1px solid var(--line);max-width:100%}
+.ph img{width:100%;height:100%;object-fit:cover;display:block}
+.ph button{position:absolute;top:4px;right:4px;width:28px;height:28px;border-radius:50%;border:0;background:rgba(9,17,28,.75);color:#fff;font-size:15px;line-height:1}
+.ph span{position:absolute;left:0;right:0;bottom:0;background:rgba(9,17,28,.7);color:#fff;font-size:11px;padding:2px 6px;text-transform:uppercase;letter-spacing:.06em;font-family:var(--font-display);font-weight:600}
+.addph{aspect-ratio:1;border:1.5px dashed var(--line);border-radius:8px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:2px;color:var(--accent);font-weight:600;font-size:14px;cursor:pointer;background:var(--surface);text-align:center;padding:6px}
+.addph b{font-size:24px;line-height:1;font-weight:500}
+.addph input{position:absolute;width:1px;height:1px;opacity:0;pointer-events:none}
+
+/* chart */
+.chart svg{display:block;width:100%;height:auto;overflow:visible}
+.chart text{font-family:var(--font-data);font-size:11px;fill:var(--muted)}
+.chart .grid{stroke:var(--line);stroke-width:1}
+.chart .bar{fill:var(--accent)}
+.chart .bar.last{fill:var(--sun)}
+.chart .hit{fill:transparent;cursor:pointer}
+.chart .val{fill:var(--ink);font-weight:600}
+.tip{font-size:14px;color:var(--muted);min-height:21px}
+.tip b{color:var(--ink);font-family:var(--font-data)}
+
+/* string cards */
+.string{border:1px solid var(--line);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px;background:var(--surface)}
+table.rep{width:100%;border-collapse:collapse;font-size:14px}
+table.rep th{font-family:var(--font-display);font-weight:600;letter-spacing:.06em;text-transform:uppercase;font-size:13px;color:var(--muted);text-align:left;padding:6px 8px 6px 0;border-bottom:1px solid var(--line);white-space:nowrap}
+table.rep td{padding:7px 8px 7px 0;border-bottom:1px solid var(--line);vertical-align:top}
+table.rep td.n, table.rep th.n{text-align:right;font-family:var(--font-data);font-variant-numeric:tabular-nums;white-space:nowrap}
+.scroll{overflow-x:auto}
+
+.confirm{border:1px solid var(--bad);background:var(--bad-soft);border-radius:8px;padding:12px;display:flex;flex-direction:column;gap:10px}
+#toast{position:fixed;left:50%;bottom:calc(92px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--bg);padding:10px 16px;border-radius:999px;font-weight:600;font-size:14px;z-index:50;max-width:calc(100% - 32px);text-align:center;box-shadow:var(--shadow)}
+.foot{font-size:13px;color:var(--muted);text-align:center;padding-top:6px}
+.sticky-actions{position:sticky;bottom:calc(10px + env(safe-area-inset-bottom,0px));display:flex;gap:10px;background:var(--bg);padding:10px;border:1px solid var(--line);border-radius:12px;box-shadow:var(--shadow)}
+.sticky-actions .btn{flex:1}
+@media (prefers-reduced-motion:no-preference){.meter > i{transition:width .3s ease}}
+</style>
+
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="top-row">
+      <div class="brand"><div class="mark" aria-hidden="true"></div><div class="brand-name">Solar Health Check</div></div>
+      <button class="icon-btn" id="btn-settings" data-act="go" data-view="settings">Settings</button>
+    </div>
+    <nav class="modes" aria-label="Mode">
+      <button id="mode-home" data-act="mode" data-mode="home" aria-pressed="true">My system</button>
+      <button id="mode-tech" data-act="mode" data-mode="tech" aria-pressed="false">Technician</button>
+    </nav>
+  </header>
+  <main id="view"><div class="card"><p class="muted">Loading your saved checks…</p></div></main>
+</div>
+<div id="toast" hidden role="status" aria-live="polite"></div>
+<script>
+/* Installer details shown to everyone who opens the app. Edit these to rebrand it for another business. */
+window.SHC_CONFIG = {
+  "offline": true,
+  "installer": {
+    "business": "Sunwise Solar Cleaning",
+    "contact": "Will Richter",
+    "phone": "0481 678 552",
+    "email": "will@sunwisesolarcleaning.com",
+    "licence": ""
+  }
+};
+</script>
+<script>
+/* ---------- pure logic: dates, homeowner rating, technician maths ---------- */
+const DAY = 86400000;
+function parseDate(s){ const [y,m,d] = String(s).split('-').map(Number); return new Date(y, m-1, d); }
+function isoDate(d){ return d.getFullYear()+'-'+String(d.getMonth()+1).padStart(2,'0')+'-'+String(d.getDate()).padStart(2,'0'); }
+function todayISO(){ return isoDate(new Date()); }
+function daysBetween(a,b){ return Math.round((parseDate(b)-parseDate(a))/DAY); }
+function addMonths(s,n){ const d = parseDate(s); const day = d.getDate(); d.setDate(1); d.setMonth(d.getMonth()+n); const last = new Date(d.getFullYear(), d.getMonth()+1, 0).getDate(); d.setDate(Math.min(day,last)); return isoDate(d); }
+function num(v){ if (v === null || v === undefined || v === '') return null; const n = typeof v === 'number' ? v : parseFloat(String(v).replace(',','.')); return Number.isFinite(n) ? n : null; }
+
+/* --- homeowner --- */
+const HOME_ITEMS = [
+  {id:'dirt', q:'Dust, dirt or a grey film on the glass', help:'Compare the panels with a clean window. A dull, even haze counts.', level:'attention', clean:true,
+    action:'A professional clean with purified water removes build-up that may be holding your system back.'},
+  {id:'droppings', q:'Bird droppings or leaf litter on the panels', help:'Even small patches shade the cells underneath.', level:'attention', clean:true,
+    action:'Droppings and leaves shade individual cells. Book a clean rather than hosing from the ground, which can leave mineral spots.'},
+  {id:'lichen', q:'Lichen or moss (pale green or grey spots that do not wash off in rain)', help:'Usually starts along the bottom edge of each panel.', level:'attention', clean:true,
+    action:'Lichen bonds to the glass and needs a specific treatment. Ask your installer about lichen removal.'},
+  {id:'shade', q:'New shade on the panels between 9 am and 3 pm', help:'Tree growth, a new aerial, a neighbour’s extension.', level:'attention',
+    action:'Shade on part of a string can pull down the whole string. Trimming the tree or asking your installer about options is worth it.'},
+  {id:'birds', q:'Birds going under the panels, or nesting material in the gutter below', help:'Pigeons and mynas nest in the gap under the array.', level:'attention',
+    action:'Nests hold moisture and droppings against cables. Ask about bird proofing.'},
+  {id:'glass', q:'Cracked or shattered glass, or brown or burnt-looking marks on a panel', help:'Look for a spider-web crack pattern or a dark patch on one cell.', level:'urgent',
+    action:'A damaged panel should be assessed by a licensed electrician. Do not touch it or hose it.'},
+  {id:'cables', q:'Cables hanging loose, lying on the roof, or chewed', help:'Cables should be clipped up out of sight under the panels.', level:'urgent',
+    action:'Loose or damaged DC cabling is a fire and shock risk. Keep clear and have a licensed electrician check it.'},
+  {id:'loose', q:'A panel or rail that looks lifted, shifted or loose', help:'Check after storms and strong wind.', level:'urgent',
+    action:'Have the mounting checked before the next strong wind. Stay off the roof.'},
+  {id:'switchgear', q:'Cracks, water, rust or scorch marks on the inverter or its switches', help:'Look, do not open any covers.', level:'urgent',
+    action:'Water or heat damage in the inverter or an isolator needs a licensed electrician. Do not operate a damaged switch.'},
+  {id:'smell', q:'A burning smell, buzzing or crackling near the inverter or switchboard', help:'A quiet hum from the inverter is normal.', level:'urgent', danger:true,
+    action:'Keep clear and contact a licensed electrician today. If you see smoke or flames, call 000.'}
+];
+const INV_STATUS = [
+  {id:'green', label:'Green or normal', cls:'c-ok'},
+  {id:'orange', label:'Orange or flashing', cls:'c-warn'},
+  {id:'red', label:'Red or fault', cls:'c-issue'},
+  {id:'off', label:'Blank or off in daylight', cls:'c-issue'},
+  {id:'unsure', label:'Could not check', cls:'c-na'}
+];
+const WEATHER = ['Sunny','Partly cloudy','Overcast','Rain'];
+const RATING = {ok:'All clear', attention:'Worth a look', urgent:'Call your installer'};
+
+/* Average output between two checks, from the inverter's lifetime total. */
+function periodYield(check, prev, kw){
+  if (!check || !prev) return null;
+  const a = num(prev.inv && prev.inv.totalKwh), b = num(check.inv && check.inv.totalKwh);
+  if (a === null || b === null) return null;
+  const days = daysBetween(prev.date, check.date);
+  if (days < 7 || b < a) return null;
+  const perDay = (b - a) / days;
+  const k = num(kw);
+  return {days, from: prev.date, kwh: b - a, perDay, specific: k ? perDay / k : null};
+}
+/* checks ascending by date -> same array with .yield attached */
+function withYields(checks, kw){
+  const sorted = checks.slice().sort((x,y)=> x.date < y.date ? -1 : x.date > y.date ? 1 : 0);
+  return sorted.map((c,i)=> Object.assign({}, c, {yield: i ? periodYield(c, sorted[i-1], kw) : null}));
+}
+function yearAgo(list, i){
+  const c = list[i];
+  for (let j = i-1; j >= 0; j--){
+    const d = daysBetween(list[j].date, c.date);
+    if (d >= 320 && d <= 410 && list[j].yield) return list[j];
+  }
+  return null;
+}
+function rateCheck(c, ctx){
+  ctx = ctx || {};
+  const reasons = [];
+  const inv = c.inv || {};
+  if (inv.status === 'red') reasons.push({level:'urgent', text:'Inverter is showing a red light or fault' + (inv.code ? ' (' + inv.code + ')' : ''), action:'Note the code on the screen and call your installer. Do not reset it repeatedly.'});
+  if (inv.status === 'off') reasons.push({level:'urgent', text:'Inverter is blank or off in daylight', action:'Check the solar supply main switch in your switchboard has not tripped. If it is on and the inverter is still blank, call your installer.'});
+  if (inv.status === 'orange') reasons.push({level:'attention', text:'Inverter is showing an orange or flashing light' + (inv.code ? ' (' + inv.code + ')' : ''), action:'Often a warning rather than a fault. If it is still there tomorrow in full sun, send the code to your installer.'});
+  if ((inv.status === 'green' || !inv.status) && inv.code) reasons.push({level:'attention', text:'Inverter message: ' + inv.code, action:'Send this code to your installer so they can tell you what it means.'});
+  HOME_ITEMS.forEach(it=>{
+    if ((c.items || {})[it.id] === 'yes') reasons.push({level:it.level, text:it.q, action:it.action, item:it.id, clean:!!it.clean, danger:!!it.danger});
+  });
+  const y = ctx.yield, ya = ctx.yearAgoYield;
+  if (y && ya && ya.perDay > 0){
+    const drop = 1 - y.perDay / ya.perDay;
+    if (drop > 0.2) reasons.push({level:'attention', text:'Average output is ' + Math.round(drop*100) + '% lower than the same time last year', action:'Weather varies year to year, but a drop this size is worth a clean and a check.'});
+  }
+  if (y && y.specific !== null && y.days >= 30 && y.specific < 1.5) reasons.push({level:'attention', text:'Average output is on the low side for the size of your system', action:'Shade, short winter days or an export limit can explain it. If none of those apply, ask your installer.'});
+  const unsure = HOME_ITEMS.filter(it=> (c.items || {})[it.id] === 'unsure').length;
+  const unanswered = HOME_ITEMS.filter(it=> !(c.items || {})[it.id]).length;
+  const level = reasons.some(r=>r.level==='urgent') ? 'urgent' : reasons.some(r=>r.level==='attention') ? 'attention' : 'ok';
+  return {level, reasons, unsure, unanswered, danger: reasons.some(r=>r.danger)};
+}
+function nextDue(lastDate, months){ return addMonths(lastDate, months || 3); }
+
+/* --- technician --- */
+const TECH_GROUPS = [
+  {name:'Array', items:[
+    ['glass','Panel glass and cells'],['hotspot','Discolouration, snail trails or hot-spot marks'],['frames','Frames'],['clamps','Clamps'],
+    ['rails','Rails'],['mounts','Mounting points and roof fixings'],['soiling','Soiling and lichen'],['shading','Shading']]},
+  {name:'Wiring', items:[
+    ['cabling','Visible cabling and cable support'],['connectors','Connectors'],['conduit','Conduit and glands']]},
+  {name:'Inverter and isolation', items:[
+    ['inverter','Inverter condition'],['invstatus','Inverter status and fault history'],['roofiso','Rooftop DC isolator'],['inviso','Inverter DC isolator'],
+    ['aciso','AC isolator and solar supply main switch'],['signage','Signage and labels']]}
+];
+const TECH_ITEMS = TECH_GROUPS.reduce((a,g)=> a.concat(g.items.map(([id,label])=>({id,label,group:g.name}))), []);
+const SCOPE_NOTE = 'This is a visual, non-invasive health and performance check. It is not an electrical compliance certificate. No disconnection, alteration, repair, insulation resistance, polarity or full compliance testing was carried out unless quoted as a separate electrical service. Performance figures are indicative field readings, not laboratory efficiency testing.';
+
+/* irradiance, optional cell-temperature correction and optional losses allowance */
+function condFactor(cond){
+  cond = cond || {};
+  const g = num(cond.irr); if (g === null) return null;
+  let f = g / 1000;
+  const t = num(cond.cellTemp), gamma = num(cond.gamma);
+  if (t !== null && gamma !== null) f *= 1 + (gamma/100) * (t - 25);
+  const a = num(cond.allowance);
+  if (a !== null) f *= 1 - a/100;
+  return f;
+}
+function stringCalc(s, rep){
+  const sys = rep.sys || {};
+  const n = num(s.n), pw = num(sys.panelW), vmp = num(sys.vmp), voc = num(sys.voc);
+  const ratedW = n !== null && pw !== null ? n * pw : null;
+  const vmpStr = n !== null && vmp !== null ? n * vmp : null;
+  const vocStr = n !== null && voc !== null ? n * voc : null;
+  const estimated = s.vmode === 'rated';
+  const v = estimated ? vmpStr : num(s.v);
+  const i = num(s.i);
+  const watts = i !== null && v !== null ? i * v : null;
+  const f = condFactor(rep.cond);
+  const expected = ratedW !== null && f !== null ? ratedW * f : null;
+  const pct = watts !== null && expected ? watts / expected * 100 : null;
+  return {n, ratedW, vmpStr, vocStr, v, i, watts, expected, pct, estimated};
+}
+function reportCalc(rep){
+  const rows = (rep.strings || []).map(s=> Object.assign({s}, stringCalc(s, rep)));
+  const sum = k => rows.reduce((a,r)=> r[k] !== null ? a + r[k] : a, 0);
+  const done = rows.filter(r=> r.watts !== null && r.expected !== null);
+  const incomplete = rows.length - done.length;
+  const complete = done.length > 0;
+  const watts = rows.some(r=>r.watts !== null) ? sum('watts') : null;
+  const ratedW = rows.some(r=>r.ratedW !== null) ? sum('ratedW') : null;
+  const expected = complete ? done.reduce((a,r)=> a + r.expected, 0) : null;
+  const pct = complete && expected ? done.reduce((a,r)=> a + r.watts, 0) / expected * 100 : null;
+  return {rows, watts, ratedW, expected, pct, complete, incomplete, anyEstimated: rows.some(r=> r.estimated && r.watts !== null), factor: condFactor(rep.cond)};
+}
+function pctBand(p){ if (p === null || p === undefined) return 'none'; return p >= 90 ? 'ok' : p >= 75 ? 'attention' : 'urgent'; }
+function pctWords(p){ const b = pctBand(p); return b === 'ok' ? 'In line with expected output for the conditions' : b === 'attention' ? 'Slightly below expected output for the conditions' : b === 'urgent' ? 'Well below expected output for the conditions' : 'Enter irradiance and string readings to compare with expected output'; }
+function issueItems(rep){ return TECH_ITEMS.filter(it=> ((rep.items || {})[it.id] || {}).r === 'issue').map(it=> ({id:it.id, label:it.label, group:it.group, note:(rep.items[it.id].note || '')})); }
+
+if (typeof module !== 'undefined') module.exports = {parseDate, isoDate, daysBetween, addMonths, num, periodYield, withYields, yearAgo, rateCheck, nextDue, condFactor, stringCalc, reportCalc, pctBand, HOME_ITEMS, TECH_ITEMS};
+
+/* ---------- app state, storage, shared helpers ---------- */
+const $ = (s, r) => (r || document).querySelector(s);
+const esc = v => String(v === null || v === undefined ? '' : v).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+const uid = () => Date.now().toString(36) + Math.random().toString(36).slice(2, 7);
+const fmtDate = s => s ? parseDate(s).toLocaleDateString('en-AU', {day:'numeric', month:'short', year:'numeric'}) : '';
+const fmtShort = s => s ? parseDate(s).toLocaleDateString('en-AU', {month:'short', year:'2-digit'}) : '';
+const fmtN = (v, d) => v === null || v === undefined || !Number.isFinite(v) ? '–' : v.toLocaleString('en-AU', {minimumFractionDigits:d || 0, maximumFractionDigits:d || 0});
+
+const FRAMED = !!(window.claude && typeof window.claude.use === 'function');   // true inside Claude, false when hosted on its own
+const CONFIG = window.SHC_CONFIG || {};
+const S = {
+  mode:'home', view:'h-home', loading:true,
+  installer:{}, canEditInstaller:true,
+  system:null, checks:[], reports:[],
+  draft:null, step:0, openId:null,
+  rep:null, tab:'details', confirm:null, tipIdx:null,
+  photos:{}, backendNote:'', canSave:false
+};
+
+/* ----- local storage: IndexedDB with an in-memory fallback ----- */
+const local = {
+  mem:new Map(), idb:null,
+  async open(){
+    try{
+      this.idb = await new Promise((res, rej)=>{
+        const rq = indexedDB.open('solar-health-check', 1);
+        rq.onupgradeneeded = () => rq.result.createObjectStore('docs');
+        rq.onsuccess = () => res(rq.result); rq.onerror = () => rej(rq.error); rq.onblocked = () => rej(new Error('blocked'));
+      });
+    }catch(e){ this.idb = null; }
+  },
+  tx(mode, fn){
+    return new Promise((res, rej)=>{
+      const t = this.idb.transaction('docs', mode); const st = t.objectStore('docs');
+      const out = fn(st); t.oncomplete = () => res(out.result !== undefined ? out.result : out.value); t.onerror = () => rej(t.error);
+    });
+  },
+  async list(prefix){
+    if (!this.idb) return [...this.mem.entries()].filter(([k])=>k.startsWith(prefix + '/')).map(([,v])=>v);
+    try{ return await this.tx('readonly', st => st.getAll(IDBKeyRange.bound(prefix + '/', prefix + '/￿'))); }catch(e){ return []; }
+  },
+  async get(key){
+    if (!this.idb) return this.mem.get(key) || null;
+    try{ return (await this.tx('readonly', st => st.get(key))) || null; }catch(e){ return null; }
+  },
+  async put(key, doc){
+    if (!this.idb){ this.mem.set(key, doc); return; }
+    try{ await this.tx('readwrite', st => st.put(doc, key)); }catch(e){ this.mem.set(key, doc); }
+  },
+  async del(key){
+    this.mem.delete(key);
+    if (this.idb) try{ await this.tx('readwrite', st => st.delete(key)); }catch(e){}
+  }
+};
+
+/* ----- cloud storage: the viewer's private area, when their account allows it ----- */
+const cloud = { db:null, base:null, ok:false, queue:Promise.resolve() };
+const store = {
+  where(){ return cloud.ok ? 'cloud' : 'local'; },
+  async list(coll){
+    const out = new Map();
+    (await local.list(coll)).forEach(d => out.set(d.id, d));
+    if (cloud.ok) try{ (await cloud.base.collection(coll).get()).docs.forEach(d => out.set(d.id, Object.assign({}, d.data(), {id:d.id}))); }catch(e){}
+    return [...out.values()];
+  },
+  put(coll, doc){
+    const body = JSON.parse(JSON.stringify(doc));
+    cloud.queue = cloud.queue.then(async ()=>{
+      if (cloud.ok){
+        try{ await cloud.base.collection(coll).doc(doc.id).set(body); return; }
+        catch(e){ if (e && e.code !== 'unavailable' && e.code !== 'resource_exhausted'){ cloud.ok = false; setBackendNote(); } }
+      }
+      await local.put(coll + '/' + doc.id, body);
+    });
+    return cloud.queue;
+  },
+  del(coll, id){
+    cloud.queue = cloud.queue.then(async ()=>{
+      await local.del(coll + '/' + id);
+      if (cloud.ok) try{ await cloud.base.collection(coll).doc(id).delete(); }catch(e){}
+    });
+    return cloud.queue;
+  },
+  async photosFor(parent){
+    const out = new Map();
+    (await local.list('photos')).filter(p => p.parent === parent).forEach(p => out.set(p.id, p));
+    if (cloud.ok) try{ (await cloud.base.collection('photos').where('parent', '==', parent).get()).docs.forEach(d => out.set(d.id, Object.assign({}, d.data(), {id:d.id}))); }catch(e){}
+    return [...out.values()].sort((a,b)=> (a.t || 0) - (b.t || 0));
+  }
+};
+function setBackendNote(){
+  S.backendNote = cloud.ok ? 'Your checks are saved to your Claude account, so they follow you between phone and computer.' : 'Your checks are saved in this browser on this device.';
+}
+
+async function loadAll(){
+  const [sys, checks, reports] = await Promise.all([store.list('profile'), store.list('checks'), store.list('reports')]);
+  S.system = sys.find(d => d.id === 'system') || null;
+  S.checks = checks; S.reports = reports;
+}
+async function connectCloud(){
+  const c = window.claude;
+  if (!c || typeof c.use !== 'function') return;
+  const [db, user, downloads] = await Promise.all([c.use('db'), c.use('user'), c.use('downloads')].map(p => p.catch(()=>null)));
+  S.downloads = downloads || null;
+  if (!db) return;
+  cloud.db = db;
+  let id = null, canEdit = false;
+  if (user){ try{ id = await user.id(); canEdit = await user.canEdit(); }catch(e){} }
+  // installer details are shared: everyone reads them, editors change them
+  try{
+    const snap = await db.doc('config/installer').get();
+    if (snap.exists) S.installer = Object.assign({}, snap.data());
+    S.installerShared = true; S.canEditInstaller = canEdit;
+  }catch(e){}
+  if (id){
+    try{
+      cloud.base = db.doc('data/users/' + id + '/app');
+      await cloud.base.collection('checks').limit(1).get();
+      cloud.ok = true;
+    }catch(e){ cloud.ok = false; }
+  }
+}
+async function saveInstaller(){
+  const body = JSON.parse(JSON.stringify(S.installer));
+  if (S.installerShared && cloud.db){
+    try{ await cloud.db.doc('config/installer').set(body); toast('Installer details saved for everyone who opens this app'); return; }
+    catch(e){ toast('Only the app owner can change the installer details'); return; }
+  }
+  await local.put('config/installer', Object.assign({id:'installer'}, body));
+  toast('Installer details saved');
+}
+
+/* ----- photos ----- */
+function shrinkPhoto(file){
+  return new Promise((res, rej)=>{
+    const url = URL.createObjectURL(file); const img = new Image();
+    img.onload = () => {
+      try{
+        let max = 1280, q = 0.72, data = '';
+        for (let k = 0; k < 6; k++){
+          const sc = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+          const cv = document.createElement('canvas');
+          cv.width = Math.max(1, Math.round(img.naturalWidth * sc)); cv.height = Math.max(1, Math.round(img.naturalHeight * sc));
+          cv.getContext('2d').drawImage(img, 0, 0, cv.width, cv.height);
+          data = cv.toDataURL('image/jpeg', q);
+          if (data.length < 225000) break;     // keeps each photo inside the 256 KiB document limit
+          if (q > 0.5) q -= 0.14; else max = Math.round(max * 0.78);
+        }
+        URL.revokeObjectURL(url); res(data);
+      }catch(e){ URL.revokeObjectURL(url); rej(e); }
+    };
+    img.onerror = () => { URL.revokeObjectURL(url); rej(new Error('That file is not a photo this browser can read')); };
+    img.src = url;
+  });
+}
+async function addPhotos(parent, kind, files){
+  const list = S.photos[parent] || (S.photos[parent] = []);
+  let failed = 0;
+  for (const f of files){
+    try{
+      const data = await shrinkPhoto(f);
+      const p = {id:uid(), parent, kind, data, t:Date.now()};
+      list.push(p); await store.put('photos', p);
+    }catch(e){ failed++; }
+  }
+  if (failed) toast(failed + ' photo' + (failed > 1 ? 's' : '') + ' could not be read. Try a JPEG or PNG.');
+  render();
+}
+async function loadPhotos(parent){
+  if (S.photos[parent]) return;
+  S.photos[parent] = [];
+  const got = await store.photosFor(parent);
+  S.photos[parent] = got;
+  if (got.length) render();
+}
+async function removePhoto(parent, id){
+  S.photos[parent] = (S.photos[parent] || []).filter(p => p.id !== id);
+  await store.del('photos', id); render();
+}
+function photoGrid(parent, kinds, editable){
+  const list = S.photos[parent] || [];
+  let h = '<div class="photos">';
+  list.forEach(p => {
+    h += '<div class="ph"><img src="' + p.data + '" alt="' + esc(p.kind) + ' photo">' + (kinds.length > 1 ? '<span>' + esc(p.kind) + '</span>' : '') +
+      (editable ? '<button data-act="photo-del" data-parent="' + esc(parent) + '" data-id="' + esc(p.id) + '" aria-label="Remove photo">×</button>' : '') + '</div>';
+  });
+  if (editable) kinds.forEach(k => {
+    h += '<label class="addph ph" style="border-style:dashed"><b>+</b>' + esc(k) + '<input type="file" accept="image/*" multiple data-photo="' + esc(k) + '" data-parent="' + esc(parent) + '" id="ph-' + esc(parent) + '-' + esc(k) + '"></label>';
+  });
+  if (!editable && !list.length) return '<p class="muted small">No photos.</p>';
+  return h + '</div>';
+}
+
+/* ----- small UI helpers ----- */
+let toastTimer = null;
+function toast(msg){ const t = $('#toast'); t.textContent = msg; t.hidden = false; clearTimeout(toastTimer); toastTimer = setTimeout(()=>{ t.hidden = true; }, 3200); }
+async function copyText(text, okMsg){
+  try{ await navigator.clipboard.writeText(text); toast(okMsg || 'Copied'); }
+  catch(e){
+    const ta = document.createElement('textarea'); ta.value = text; ta.setAttribute('readonly', ''); ta.style.cssText = 'position:fixed;left:16px;right:16px;bottom:70px;height:160px;z-index:60';
+    document.body.appendChild(ta); ta.select(); toast('Select all and copy the text above'); setTimeout(()=> ta.remove(), 15000);
+  }
+}
+function getPath(path){ return path.split('.').reduce((o,k)=> o == null ? o : o[k], S); }
+function setPath(path, val){
+  const ks = path.split('.'); let o = S;
+  for (let i = 0; i < ks.length - 1; i++){ if (o[ks[i]] == null || typeof o[ks[i]] !== 'object') o[ks[i]] = {}; o = o[ks[i]]; }
+  o[ks[ks.length - 1]] = val;
+}
+function field(label, path, opt){
+  opt = opt || {};
+  const v = getPath(path); const id = 'f-' + path.replace(/[^a-z0-9]/gi, '-');
+  const type = opt.type || 'text';
+  const attrs = 'id="' + id + '" data-bind="' + path + '"' + (opt.num ? ' data-num="1" inputmode="decimal" class="num"' : '') + (opt.ph ? ' placeholder="' + esc(opt.ph) + '"' : '') + (opt.mode ? ' inputmode="' + opt.mode + '"' : '');
+  let input;
+  if (type === 'textarea') input = '<textarea ' + attrs + '>' + esc(v) + '</textarea>';
+  else if (type === 'select') input = '<select ' + attrs + '>' + opt.options.map(o => '<option value="' + esc(o[0]) + '"' + (String(v == null ? '' : v) === String(o[0]) ? ' selected' : '') + '>' + esc(o[1]) + '</option>').join('') + '</select>';
+  else input = '<input type="' + (opt.num ? 'text' : type) + '" ' + attrs + ' value="' + esc(v) + '">';
+  if (opt.unit) input = '<div class="unit">' + input + '<i>' + esc(opt.unit) + '</i></div>';
+  return '<label class="field" for="' + id + '"><span>' + esc(label) + '</span>' + input + (opt.help ? '<small>' + esc(opt.help) + '</small>' : '') + '</label>';
+}
+function chips(path, options, extra){
+  const v = getPath(path);
+  return '<div class="chips" role="group">' + options.map(o => {
+    const val = Array.isArray(o) ? o[0] : o.id || o, label = Array.isArray(o) ? o[1] : o.label || o, cls = Array.isArray(o) ? (o[2] || '') : (o.cls || '');
+    return '<button class="chip ' + cls + '" data-act="set" data-path="' + path + '" data-val="' + esc(val) + '"' + (extra || '') + ' aria-pressed="' + (v !== null && v !== undefined && String(v) === String(val)) + '">' + esc(label) + '</button>';
+  }).join('') + '</div>';
+}
+function installerCard(title){
+  const i = S.installer || {};
+  if (!i.phone && !i.business && !i.email){
+    return '<div class="card"><div class="eyebrow">' + esc(title || 'Your installer') + '</div><p class="muted">No installer details yet. ' + (S.canEditInstaller ? 'Add the business name and phone number in Settings so the call button works.' : 'Contact the licensed electrician or solar business that looks after your system.') + '</p>' +
+      (S.canEditInstaller ? '<button class="btn sm" data-act="go" data-view="settings">Add installer details</button>' : '') + '</div>';
+  }
+  const tel = String(i.phone || '').replace(/[^0-9+]/g, '');
+  return '<div class="card"><div class="eyebrow">' + esc(title || 'Your installer') + '</div>' +
+    '<div><h2>' + esc(i.business || i.contact || 'Your installer') + '</h2>' + (i.business && i.contact ? '<p class="muted">' + esc(i.contact) + (i.licence ? ' · Licence ' + esc(i.licence) : '') + '</p>' : '') + '</div>' +
+    (i.phone ? '<div class="phone">' + esc(i.phone) + '</div><div class="row"><a class="btn primary grow" href="tel:' + esc(tel) + '">Call</a><button class="btn grow" data-act="copy" data-text="' + esc(i.phone) + '">Copy number</button></div>' : '') +
+    (i.email ? '<p class="small" style="user-select:all;-webkit-user-select:all;overflow-wrap:anywhere">' + esc(i.email) + '</p>' : '') +
+    (FRAMED ? '<p class="small muted">If the Call button does nothing on your device, copy the number into your phone.</p>' : '') + '</div>';
+}
+function confirmBox(key, msg, yesLabel){
+  if (S.confirm !== key) return '';
+  return '<div class="confirm"><p>' + esc(msg) + '</p><div class="row"><button class="btn danger sm" data-act="confirm-yes" data-key="' + esc(key) + '">' + esc(yesLabel) + '</button><button class="btn sm" data-act="confirm-no">Keep it</button></div></div>';
+}
+
+/* ---------- homeowner mode ---------- */
+function demoHome(){
+  const t = new Date(); const d = n => isoDate(new Date(t.getFullYear(), t.getMonth(), t.getDate() - n));
+  const none = {}; HOME_ITEMS.forEach(i => none[i.id] = 'no');
+  return {
+    system:{id:'system', kw:'6.6', panels:'20', inverter:'5 kW string inverter', year:'2021', months:3},
+    checks:[
+      {id:'ex1', date:d(330), weather:'Sunny', inv:{status:'green', totalKwh:'18400'}, items:none, notes:''},
+      {id:'ex2', date:d(225), weather:'Sunny', inv:{status:'green', totalKwh:'21004'}, items:none, notes:''},
+      {id:'ex3', date:d(118), weather:'Partly cloudy', inv:{status:'green', totalKwh:'23283'}, items:none, notes:''},
+      {id:'ex4', date:d(14), weather:'Sunny', inv:{status:'green', totalKwh:'26081', yesterdayKwh:'31.2'}, items:Object.assign({}, none, {droppings:'yes', birds:'unsure'}), notes:'Pigeons on the ridge most mornings.'}
+    ]
+  };
+}
+function homeData(){
+  const example = !S.system;
+  const src = example ? demoHome() : {system:S.system, checks:S.checks};
+  const list = withYields(src.checks, src.system.kw).map((c, i, arr) => {
+    const ya = yearAgo(arr, i);
+    return Object.assign(c, {rating: rateCheck(c, {yield:c.yield, yearAgoYield: ya ? ya.yield : null})});
+  });
+  return {example, system:src.system, list};
+}
+function dueInfo(d){
+  const last = d.list[d.list.length - 1];
+  if (!last) return {big:'Ready for your first check', sub:'It takes about ten minutes from the ground.', cls:'none'};
+  const due = nextDue(last.date, d.system.months);
+  const n = daysBetween(todayISO(), due);
+  const sub = 'Last checked ' + fmtDate(last.date) + ' · every ' + (d.system.months || 3) + ' months';
+  if (n < 0) return {big:'Check overdue by ' + (-n) + ' day' + (n === -1 ? '' : 's'), sub, due, overdue:true};
+  if (n === 0) return {big:'Check due today', sub, due};
+  return {big:'Next check ' + fmtDate(due), sub: sub + ' · ' + n + ' day' + (n === 1 ? '' : 's') + ' to go', due};
+}
+function niceMax(v){ const m = v * 1.12; const p = Math.pow(10, Math.floor(Math.log10(m))); return [1, 2, 2.5, 5, 10].map(k => k * p).find(k => k >= m); }
+function yieldChart(list){
+  const pts = list.filter(c => c.yield).slice(-8);
+  if (!pts.length) return '<p class="muted small">Enter your inverter’s lifetime total (often shown as E-Total) at each check. From the second check on, this chart shows your average output per day between checks.</p>';
+  const W = 320, H = 150, L = 30, R = 6, T = 18, B = 22, pw = W - L - R, ph = H - T - B;
+  const max = niceMax(Math.max.apply(null, pts.map(c => c.yield.perDay)));
+  const y = v => T + ph - (v / max) * ph;
+  const slot = pw / pts.length, bw = Math.min(30, slot * 0.6);
+  let s = '<svg viewBox="0 0 ' + W + ' ' + H + '" role="img" aria-label="Average kilowatt-hours per day between checks">';
+  [0, max / 2, max].forEach(v => { s += '<line class="grid" x1="' + L + '" x2="' + (W - R) + '" y1="' + y(v) + '" y2="' + y(v) + '"/><text x="' + (L - 6) + '" y="' + (y(v) + 4) + '" text-anchor="end">' + fmtN(v, v % 1 ? 1 : 0) + '</text>'; });
+  pts.forEach((c, i) => {
+    const cx = L + slot * i + slot / 2, top = y(c.yield.perDay), x = cx - bw / 2, base = y(0), r = Math.min(4, (base - top) / 2);
+    s += '<path class="bar' + (i === pts.length - 1 ? ' last' : '') + '" d="M' + x + ',' + base + ' V' + (top + r) + ' Q' + x + ',' + top + ' ' + (x + r) + ',' + top + ' H' + (x + bw - r) + ' Q' + (x + bw) + ',' + top + ' ' + (x + bw) + ',' + (top + r) + ' V' + base + ' Z"/>';
+    s += '<text x="' + cx + '" y="' + (H - 6) + '" text-anchor="middle">' + esc(fmtShort(c.date)) + '</text>';
+    if (i === pts.length - 1) s += '<text class="val" x="' + cx + '" y="' + (top - 5) + '" text-anchor="middle">' + fmtN(c.yield.perDay, 1) + '</text>';
+    s += '<rect class="hit" data-act="tip" data-i="' + i + '" x="' + (L + slot * i) + '" y="' + T + '" width="' + slot + '" height="' + (ph + B) + '"><title>' + esc(fmtDate(c.date)) + '</title></rect>';
+  });
+  s += '</svg>';
+  const sel = pts[S.tipIdx === null || S.tipIdx >= pts.length ? pts.length - 1 : S.tipIdx];
+  const tip = '<div class="tip"><b>' + fmtN(sel.yield.perDay, 1) + ' kWh a day</b> from ' + esc(fmtDate(sel.yield.from)) + ' to ' + esc(fmtDate(sel.date)) + (sel.yield.specific !== null ? ' · ' + fmtN(sel.yield.specific, 1) + ' kWh per kW' : '') + '</div>';
+  return '<div class="chart">' + s + '</div>' + tip + '<p class="small muted">Output rises in summer and falls in winter, so compare each bar with the same season a year earlier. Tap a bar for its dates.</p>';
+}
+const views = {};
+views['h-home'] = function(){
+  const d = homeData(), due = dueInfo(d), last = d.list[d.list.length - 1];
+  let h = '';
+  if (d.example) h += '<div class="banner"><span><strong>Example system shown.</strong> Add your own to start your record.</span><button class="btn sm primary" data-act="go" data-view="h-setup">Set up my system</button></div>';
+  h += '<section class="hero"><div class="eyebrow">Your solar system' + (d.example ? ' · example' : '') + '</div><div class="big">' + esc(due.big) + '</div><div class="sub">' + esc(due.sub) + '</div>' +
+    '<div class="row"><button class="btn primary grow" data-act="start-check">' + (S.draft ? 'Continue your check' : 'Start a health check') + '</button></div></section>';
+  if (last){
+    const top = last.rating.reasons.slice().sort((a, b) => (a.level === 'urgent' ? 0 : 1) - (b.level === 'urgent' ? 0 : 1)).slice(0, 3);
+    h += '<section class="card"><div class="row between"><div class="eyebrow">Latest check · ' + esc(fmtDate(last.date)) + '</div><span class="pill ' + last.rating.level + '">' + RATING[last.rating.level] + '</span></div>' +
+      (top.length ? '<ul class="plain">' + top.map(r => '<li class="' + r.level + '"><i></i><span>' + esc(r.text) + '</span></li>').join('') + '</ul>' : '<p>Nothing you reported needs attention.</p>') +
+      '<button class="btn" data-act="open-check" data-id="' + esc(last.id) + '">Open this check</button></section>';
+  }
+  h += '<section class="card"><div><div class="eyebrow">Output trend</div><h2>Average kWh per day between checks</h2></div>' + yieldChart(d.list) + '</section>';
+  h += '<section class="card"><div class="row between"><div class="eyebrow">System</div>' + (d.example ? '' : '<button class="linkish small" data-act="go" data-view="h-setup">Edit</button>') + '</div>' +
+    '<div class="readouts three"><div class="readout"><span>Size</span><b>' + esc(d.system.kw || '–') + '</b><em>kW</em></div><div class="readout"><span>Panels</span><b>' + esc(d.system.panels || '–') + '</b><em>installed ' + esc(d.system.year || '–') + '</em></div><div class="readout"><span>Checks</span><b>' + d.list.length + '</b><em>on record</em></div></div>' +
+    (d.system.inverter ? '<p class="small muted">Inverter: ' + esc(d.system.inverter) + '</p>' : '') + '</section>';
+  if (d.list.length){
+    h += '<section class="card"><div class="eyebrow">History</div><div class="list">' + d.list.slice().reverse().map(c =>
+      '<button class="item" data-act="open-check" data-id="' + esc(c.id) + '"><div class="grow"><div class="t">' + esc(fmtDate(c.date)) + '</div><div class="s">' +
+      (c.yield ? fmtN(c.yield.perDay, 1) + ' kWh a day since the check before' : (c.weather || 'First reading on record')) + '</div></div><span class="pill ' + c.rating.level + '">' + RATING[c.rating.level] + '</span><span class="chev">›</span></button>').join('') + '</div></section>';
+  }
+  h += installerCard();
+  h += '<p class="foot">A check from the ground helps you spot problems early. It does not replace an inspection by a licensed electrician.</p>';
+  return h;
+};
+views['h-setup'] = function(){
+  if (!S.sysDraft) S.sysDraft = Object.assign({kw:'', panels:'', inverter:'', year:'', months:3}, S.system || {});
+  return '<button class="linkish" data-act="go" data-view="h-home">‹ Back</button>' +
+    '<section class="card"><div><div class="eyebrow">Set up</div><h1>Your solar system</h1></div>' +
+    '<p class="muted">You will find these on your installation paperwork or the label on the inverter. Leave blank anything you are not sure of.</p>' +
+    '<div class="grid2">' + field('System size', 'sysDraft.kw', {num:1, unit:'kW', ph:'6.6'}) + field('Number of panels', 'sysDraft.panels', {num:1, ph:'20'}) + '</div>' +
+    field('Inverter make and model', 'sysDraft.inverter', {ph:'On the label on the side of the inverter'}) +
+    field('Year installed', 'sysDraft.year', {num:1, ph:'2021'}) +
+    '<div class="field"><span class="label">Check every</span>' + chips('sysDraft.months', [[3, '3 months'], [4, '4 months']]) + '</div>' +
+    '<button class="btn primary block" data-act="save-system">Save system</button></section>';
+};
+const CHECK_STEPS = ['Before you start', 'Inverter', 'Panels and wiring', 'Photos and notes'];
+function newCheck(){ return {id:uid(), date:todayISO(), weather:'', inv:{status:'', code:'', totalKwh:'', yesterdayKwh:''}, items:{}, notes:''}; }
+views['h-check'] = function(){
+  const c = S.draft, n = S.step;
+  let h = '<div class="stack"><div class="row between"><div class="eyebrow">Step ' + (n + 1) + ' of ' + CHECK_STEPS.length + '</div><button class="linkish small" data-act="confirm-ask" data-key="discard">Discard check</button></div>' +
+    '<div class="steps">' + CHECK_STEPS.map((_, i) => '<i class="' + (i <= n ? 'on' : '') + '"></i>').join('') + '</div><h1>' + CHECK_STEPS[n] + '</h1>' + confirmBox('discard', 'Discard this check? Your answers and photos will be removed.', 'Discard') + '</div>';
+  if (n === 0){
+    h += '<section class="card"><div class="safety"><strong>Stay on the ground for the whole check.</strong> Everything here can be seen from the yard, a window or the street.</div>' +
+      '<ul class="plain"><li class="ok"><i></i><span>Do it in daylight, ideally between 9 am and 3 pm on a clear day.</span></li>' +
+      '<li class="ok"><i></i><span>Use your phone camera’s zoom, or binoculars, to see the panels.</span></li>' +
+      '<li class="urgent"><i></i><span>Do not climb on the roof or lean a ladder near the panels.</span></li>' +
+      '<li class="urgent"><i></i><span>Do not touch panels or cables, and do not open the inverter or any switch covers.</span></li>' +
+      '<li class="urgent"><i></i><span>Do not hose the panels. Tap water on hot glass can crack it or leave mineral spots.</span></li></ul></section>';
+  } else if (n === 1){
+    h += '<section class="card">' + field('Date of check', 'draft.date', {type:'date'}) +
+      '<div class="field"><span class="label">Weather right now</span>' + chips('draft.weather', WEATHER) + '</div></section>' +
+      '<section class="card"><div class="field"><span class="label">Inverter light or screen</span>' + chips('draft.inv.status', INV_STATUS) + '<small>The inverter is the box on the wall, usually near your switchboard or in the garage.</small></div>' +
+      field('Error code or message, if any', 'draft.inv.code', {ph:'e.g. State 509 or Isolation fault'}) + '</section>' +
+      '<section class="card">' + field('Lifetime total', 'draft.inv.totalKwh', {num:1, unit:'kWh', ph:'26081', help:'Shown on the screen or in your inverter’s app as E-Total, Total energy or Lifetime. This is what builds your trend.'}) +
+      field('Yesterday’s total (optional)', 'draft.inv.yesterdayKwh', {num:1, unit:'kWh', ph:'31.2'}) + '</section>';
+  } else if (n === 2){
+    h += '<section class="card"><p class="muted">Tick what you can see. Answer “Can’t tell” for anything out of view.</p><div>' + HOME_ITEMS.map(it =>
+      '<div class="q"><h3>' + esc(it.q) + '</h3><p class="small">' + esc(it.help) + '</p>' + chips('draft.items.' + it.id, [['no', 'Not there', 'c-ok'], ['yes', 'I can see this', it.level === 'urgent' ? 'c-issue' : 'c-warn'], ['unsure', 'Can’t tell', 'c-na']]) + '</div>').join('') + '</div></section>';
+  } else {
+    h += '<section class="card"><div><div class="eyebrow">Photos</div><p class="muted small">One of the panels and one of the inverter screen is enough. They let you compare from check to check.</p></div>' + photoGrid(c.id, ['Panels', 'Inverter'], true) + '</section>' +
+      '<section class="card">' + field('Anything else you noticed', 'draft.notes', {type:'textarea', ph:'e.g. Pigeons on the ridge, tree next door getting taller'}) + '</section>';
+  }
+  h += '<div class="sticky-actions">' + (n > 0 ? '<button class="btn" data-act="step" data-d="-1">Back</button>' : '') +
+    (n < CHECK_STEPS.length - 1 ? '<button class="btn primary" data-act="step" data-d="1">' + (n === 0 ? 'I’ll stay on the ground' : 'Next') + '</button>' : '<button class="btn primary" data-act="finish-check">Finish check</button>') + '</div>';
+  return h;
+};
+function checkSummary(c, d){
+  const r = c.rating, sys = d.system, L = [];
+  L.push('Solar health check, ' + fmtDate(c.date));
+  L.push('System: ' + [sys.kw ? sys.kw + ' kW' : '', sys.panels ? sys.panels + ' panels' : '', sys.inverter || ''].filter(Boolean).join(', '));
+  L.push('Result: ' + RATING[r.level]);
+  r.reasons.forEach(x => L.push('- ' + x.text));
+  const st = INV_STATUS.find(s => s.id === c.inv.status);
+  L.push('Inverter: ' + (st ? st.label : 'not recorded') + (c.inv.code ? ', code ' + c.inv.code : '') + (num(c.inv.totalKwh) !== null ? ', lifetime total ' + fmtN(num(c.inv.totalKwh)) + ' kWh' : ''));
+  if (c.yield) L.push('Average ' + fmtN(c.yield.perDay, 1) + ' kWh a day over the ' + c.yield.days + ' days since the last check');
+  if (c.weather) L.push('Weather: ' + c.weather);
+  if (c.notes) L.push('Notes: ' + c.notes);
+  return L.join('\n');
+}
+views['h-result'] = function(){
+  const d = homeData(), c = d.list.find(x => x.id === S.openId);
+  if (!c){ S.view = 'h-home'; return views['h-home'](); }
+  const r = c.rating, due = nextDue(c.date, d.system.months);
+  const lead = r.level === 'ok' ? 'Nothing you reported needs attention. Your next check is due ' + fmtDate(due) + '.'
+    : r.level === 'attention' ? 'Nothing urgent, but ' + (r.reasons.length === 1 ? 'one thing' : r.reasons.length + ' things') + ' you reported could be holding your system back.'
+    : 'Something you reported should be looked at by a licensed electrician.';
+  let h = '<button class="linkish" data-act="go" data-view="h-home">‹ All checks</button>';
+  h += '<section class="verdict ' + r.level + '"><div class="eyebrow" style="color:inherit">' + esc(fmtDate(c.date)) + (d.example ? ' · example' : '') + '</div><h1>' + RATING[r.level] + '</h1><p>' + esc(lead) + '</p></section>';
+  if (r.danger) h += '<div class="safety"><strong>Keep clear of the inverter and switchboard.</strong> Contact a licensed electrician today. If you see smoke or flames, call 000.</div>';
+  if (r.reasons.length){
+    h += '<section class="card"><div class="eyebrow">What you found</div><ul class="plain">' + r.reasons.slice().sort((a, b) => (a.level === 'urgent' ? 0 : 1) - (b.level === 'urgent' ? 0 : 1)).map(x =>
+      '<li class="' + x.level + '"><i></i><div><strong>' + esc(x.text) + '</strong><p class="small muted">' + esc(x.action) + '</p></div></li>').join('') + '</ul></section>';
+  }
+  const hidden = r.unsure + r.unanswered;
+  if (hidden) h += '<div class="banner"><span><strong>' + hidden + ' item' + (hidden > 1 ? 's' : '') + ' could not be seen from the ground.</strong> An on-roof inspection by a technician covers these.</span></div>';
+  const st = INV_STATUS.find(s => s.id === c.inv.status);
+  h += '<section class="card"><div class="eyebrow">Readings</div><div class="readouts">' +
+    '<div class="readout"><span>Average since last check</span><b>' + (c.yield ? fmtN(c.yield.perDay, 1) : '–') + '</b><em>kWh a day' + (c.yield ? ' over ' + c.yield.days + ' days' : '') + '</em></div>' +
+    '<div class="readout"><span>Per kW installed</span><b>' + (c.yield && c.yield.specific !== null ? fmtN(c.yield.specific, 1) : '–') + '</b><em>kWh per kW a day</em></div>' +
+    '<div class="readout"><span>Lifetime total</span><b>' + fmtN(num(c.inv.totalKwh)) + '</b><em>kWh</em></div>' +
+    '<div class="readout"><span>Inverter</span><b style="font-size:15px">' + esc(st ? st.label : 'Not recorded') + '</b><em>' + esc(c.inv.code || c.weather || '') + '</em></div></div>' +
+    (!c.yield ? '<p class="small muted">Your average shows from the second check that has a lifetime total.</p>' : '') + '</section>';
+  h += installerCard(r.level === 'urgent' ? 'Who to call' : 'Your installer');
+  h += '<section class="card"><div class="eyebrow">Send this check</div><p class="muted small">Copy a short summary to paste into a text or email to your installer.</p><button class="btn" data-act="copy" data-text="' + esc(checkSummary(c, d)) + '" data-ok="Summary copied">Copy summary</button></section>';
+  if (!d.example) h += '<section class="card"><div class="eyebrow">Photos</div>' + photoGrid(c.id, ['Panels', 'Inverter'], false) + '</section>';
+  if (c.notes) h += '<section class="card"><div class="eyebrow">Notes</div><p>' + esc(c.notes) + '</p></section>';
+  if (!d.example) h += '<button class="btn danger" data-act="confirm-ask" data-key="del-check">Delete this check</button>' + confirmBox('del-check', 'Delete this check and its photos? This cannot be undone.', 'Delete check');
+  return h;
+};
+views['settings'] = function(){
+  const i = S.installer || (S.installer = {});
+  let h = '<button class="linkish" data-act="go" data-view="' + (S.mode === 'tech' ? 't-home' : 'h-home') + '">‹ Back</button>';
+  h += '<section class="card"><div><div class="eyebrow">Settings</div><h1>Installer details</h1></div>';
+  if (S.canEditInstaller){
+    h += '<p class="muted">Shown on the call card for homeowners and at the top of technician reports.</p>' +
+      field('Business name', 'installer.business', {ph:'Your solar or electrical business'}) + field('Contact name', 'installer.contact') +
+      field('Phone', 'installer.phone', {type:'tel', mode:'tel'}) + field('Email', 'installer.email', {type:'email', mode:'email'}) +
+      field('Electrical licence number (optional)', 'installer.licence') +
+      '<button class="btn primary block" data-act="save-installer">Save installer details</button>';
+  } else {
+    h += '<p class="muted">Set by the business that shared this app with you.</p><div class="readouts"><div class="readout"><span>Business</span><b style="font-size:15px">' + esc(i.business || '–') + '</b></div><div class="readout"><span>Phone</span><b style="font-size:15px">' + esc(i.phone || '–') + '</b></div></div>';
+  }
+  h += '</section><section class="card"><div class="eyebrow">Where your data lives</div><p>' + esc(S.backendNote) + '</p><p class="small muted">Photos are shrunk before saving. Reminders show inside the app when you open it. It does not send notifications.</p></section>';
+  return h;
+};
+
+/* ---------- technician mode ---------- */
+function demoReport(){
+  const items = {}; TECH_ITEMS.forEach(i => items[i.id] = {r:'ok', note:''});
+  items.soiling = {r:'issue', note:'Even dust film across the array, lichen starting on the lower edge of the east string.'};
+  items.signage = {r:'issue', note:'Rooftop isolator label faded and hard to read.'};
+  return {id:'example', example:true, date:todayISO(), customer:'Example customer', site:'12 Example Street', inspector:(S.installer || {}).contact || '',
+    sys:{kw:'6.6', panels:'20', panelModel:'Winaico 330 W', panelW:'330', vmp:'34.27', voc:'40.85', inverter:'5 kW string inverter, 2 MPPT', orientation:'N', tilt:'22'},
+    cond:{weather:'Sunny', ambient:'27', irr:'850', cellTemp:'', gamma:'', allowance:''},
+    strings:[{id:'a', name:'String 1 (north)', n:'10', i:'7.9', v:'338', vmode:'measured'}, {id:'b', name:'String 2 (east)', n:'10', i:'7.1', v:'', vmode:'rated'}],
+    inv:{acW:'4980', todayKwh:'18.4', status:'Running, no active faults', codes:''}, items,
+    notes:'Readings taken at 11:40 am before cleaning.', recs:'Clean with purified water and treat lichen on the east string. Replace the rooftop isolator label.'};
+}
+function newReport(){
+  return {id:uid(), isNew:true, date:todayISO(), customer:'', site:'', inspector:(S.installer || {}).contact || '',
+    sys:{kw:'', panels:'', panelModel:'', panelW:'', vmp:'', voc:'', inverter:'', orientation:'', tilt:''},
+    cond:{weather:'', ambient:'', irr:'', cellTemp:'', gamma:'', allowance:''},
+    strings:[{id:uid(), name:'String 1', n:'', i:'', v:'', vmode:'measured'}],
+    inv:{acW:'', todayKwh:'', status:'', codes:''}, items:{}, notes:'', recs:''};
+}
+let saveTimer = null;
+function scheduleSave(){
+  if (!S.rep || S.rep.example) return;
+  const el = $('#savestate'); if (el) el.textContent = 'Saving…';
+  clearTimeout(saveTimer); saveTimer = setTimeout(saveRep, 1200);
+}
+async function saveRep(){
+  clearTimeout(saveTimer); saveTimer = null;
+  const r = S.rep; if (!r || r.example) return;
+  delete r.isNew; r.updated = Date.now();
+  const i = S.reports.findIndex(x => x.id === r.id);
+  if (i < 0) S.reports.push(r); else S.reports[i] = r;
+  await store.put('reports', r);
+  const el = $('#savestate'); if (el) el.textContent = 'Saved';
+}
+views['t-home'] = function(){
+  const reports = S.reports.slice().sort((a, b) => (b.date + (b.updated || 0)) > (a.date + (a.updated || 0)) ? 1 : -1);
+  let h = '<section class="hero"><div class="eyebrow">Technician</div><div class="big">Site health check reports</div><div class="sub">String readings against expected output, a visual inspection and photos, saved as one report.</div>' +
+    '<div class="row"><button class="btn primary grow" data-act="new-rep">New report</button></div></section>';
+  const rows = reports.length ? reports : [demoReport()];
+  if (!reports.length) h += '<div class="banner"><span><strong>Example report shown.</strong> Open it to see what a finished report looks like.</span></div>';
+  h += '<section class="card"><div class="eyebrow">Reports</div><div class="list">' + rows.map(r => {
+    const c = reportCalc(r), n = issueItems(r).length;
+    return '<button class="item" data-act="open-rep" data-id="' + esc(r.id) + '"><div class="grow"><div class="t">' + esc(r.customer || 'Unnamed customer') + '</div><div class="s">' + esc([r.site, fmtDate(r.date)].filter(Boolean).join(' · ')) + (n ? ' · ' + n + ' issue' + (n > 1 ? 's' : '') : '') + '</div></div>' +
+      '<span class="pill ' + pctBand(c.pct) + '">' + (c.pct !== null ? fmtN(c.pct) + '%' : 'No readings') + '</span><span class="chev">›</span></button>';
+  }).join('') + '</div></section>';
+  h += '<p class="foot">' + esc(S.backendNote) + '</p>';
+  return h;
+};
+const TABS = [['details', 'Details'], ['readings', 'Readings'], ['inspection', 'Inspection'], ['photos', 'Photos'], ['summary', 'Report']];
+const live = {};
+function stringLive(idx){
+  const r = S.rep, s = r.strings[idx], c = stringCalc(s, r);
+  let h = '<div class="readouts three"><div class="readout"><span>DC power</span><b>' + fmtN(c.watts) + '</b><em>W' + (c.estimated && c.watts !== null ? ', voltage estimated' : '') + '</em></div>' +
+    '<div class="readout"><span>Expected</span><b>' + fmtN(c.expected) + '</b><em>W at this irradiance</em></div>' +
+    '<div class="readout"><span>Of expected</span><b>' + (c.pct !== null ? fmtN(c.pct) + '%' : '–') + '</b><em>' + (c.ratedW !== null ? fmtN(c.ratedW / 1000, 2) + ' kW rated' : 'rated power needed') + '</em></div></div>';
+  if (c.vmpStr !== null) h += '<p class="small muted data">' + fmtN(c.n) + ' in series ≈ ' + fmtN(c.vmpStr, 1) + ' V Vmp' + (c.vocStr !== null ? ', ' + fmtN(c.vocStr, 1) + ' V Voc' : '') + '</p>';
+  return h;
+}
+function totalsBlock(r){
+  const c = reportCalc(r), band = pctBand(c.pct);
+  return '<div class="readouts three"><div class="readout"><span>Measured DC</span><b>' + fmtN(c.watts) + '</b><em>W</em></div><div class="readout"><span>Expected</span><b>' + fmtN(c.expected) + '</b><em>W</em></div><div class="readout"><span>Result</span><b>' + (c.pct !== null ? fmtN(c.pct) + '%' : '–') + '</b><em>of expected</em></div></div>' +
+    '<div class="meter ' + band + '"><i style="width:' + Math.max(0, Math.min(100, c.pct === null ? 0 : c.pct / 1.2)) + '%"></i></div><div class="ticks"><span>0</span><span>30</span><span>60</span><span>90</span><span>120%</span></div>' +
+    '<p class="small"><span class="pill wrap ' + band + '">' + esc(pctWords(c.pct)) + '</span></p>' +
+    (c.complete && c.incomplete ? '<p class="small muted">' + c.incomplete + ' string' + (c.incomplete > 1 ? 's are' : ' is') + ' missing a reading and ' + (c.incomplete > 1 ? 'are' : 'is') + ' left out of the performance figure.</p>' : '') +
+    (c.anyEstimated ? '<p class="small muted">One or more strings use rated Vmp in place of a measured voltage. Those power figures are estimates, not measurements.</p>' : '') +
+    (c.factor !== null ? '<p class="small muted data">Expected = rated W × ' + fmtN(c.factor, 3) + '</p>' : '');
+}
+live.totals = () => totalsBlock(S.rep);
+function refreshLive(){
+  document.querySelectorAll('[data-live]').forEach(el => {
+    const k = el.dataset.live;
+    el.innerHTML = k === 'totals' ? live.totals() : stringLive(+k.split('-')[1]);
+  });
+}
+function reportBody(r){
+  const c = reportCalc(r), issues = issueItems(r), done = TECH_ITEMS.filter(i => (r.items[i.id] || {}).r).length;
+  let h = '<section class="card"><div><div class="eyebrow">' + esc(fmtDate(r.date)) + (r.example ? ' · example' : '') + '</div><h1>' + esc(r.customer || 'Unnamed customer') + '</h1><p class="muted">' + esc(r.site || 'No site address yet') + '</p></div>' +
+    '<div class="readouts three"><div class="readout"><span>System</span><b>' + esc(r.sys.kw || '–') + '</b><em>kW, ' + esc(r.sys.panels || '–') + ' panels</em></div><div class="readout"><span>Irradiance</span><b>' + esc(r.cond.irr || '–') + '</b><em>W/m²</em></div><div class="readout"><span>Issues</span><b>' + issues.length + '</b><em>' + done + ' of ' + TECH_ITEMS.length + ' checked</em></div></div>' +
+    '<p class="small muted">' + esc([r.sys.panelModel, r.sys.inverter, r.sys.orientation ? 'facing ' + r.sys.orientation : '', r.sys.tilt ? r.sys.tilt + '° tilt' : '', r.cond.weather, r.cond.ambient ? r.cond.ambient + ' °C' : ''].filter(Boolean).join(' · ')) + '</p></section>';
+  h += '<section class="card"><div class="eyebrow">Performance</div>' + totalsBlock(r) + '<div class="scroll"><table class="rep"><thead><tr><th>String</th><th class="n">A</th><th class="n">V</th><th class="n">W</th><th class="n">Exp. W</th><th class="n">%</th></tr></thead><tbody>' +
+    c.rows.map(x => '<tr><td>' + esc(x.s.name || 'String') + '<br><span class="muted small">' + fmtN(x.n) + ' panels</span></td><td class="n">' + fmtN(x.i, 1) + '</td><td class="n">' + fmtN(x.v, 1) + (x.estimated && x.v !== null ? '*' : '') + '</td><td class="n">' + fmtN(x.watts) + '</td><td class="n">' + fmtN(x.expected) + '</td><td class="n">' + (x.pct !== null ? fmtN(x.pct) : '–') + '</td></tr>').join('') +
+    '</tbody></table></div>' + (c.rows.some(x => x.estimated) ? '<p class="small muted">* Rated Vmp used, not measured.</p>' : '') +
+    ((r.inv.acW || r.inv.todayKwh || r.inv.status || r.inv.codes) ? '<p class="small"><strong>Inverter:</strong> ' + esc([r.inv.acW ? r.inv.acW + ' W AC' : '', r.inv.todayKwh ? r.inv.todayKwh + ' kWh today' : '', r.inv.status, r.inv.codes ? 'codes: ' + r.inv.codes : ''].filter(Boolean).join(' · ')) + '</p>' : '') + '</section>';
+  h += '<section class="card"><div class="eyebrow">Observations</div>' + (issues.length ? '<ul class="plain">' + issues.map(i => '<li class="urgent"><i></i><div><strong>' + esc(i.label) + '</strong>' + (i.note ? '<p class="small muted">' + esc(i.note) + '</p>' : '') + '</div></li>').join('') + '</ul>' : '<p class="muted">' + (done ? 'No issues recorded in the ' + done + ' items checked.' : 'Inspection not started.') + '</p>') + '</section>';
+  return h;
+}
+views['t-edit'] = function(){
+  const r = S.rep; if (!r){ S.view = 't-home'; return views['t-home'](); }
+  let h = '<div class="row between"><button class="linkish" data-act="close-rep">‹ All reports</button><span class="small muted" id="savestate">' + (r.example ? 'Example' : r.isNew ? 'Not saved yet' : 'Saved') + '</span></div>';
+  if (r.example){
+    return h + reportBody(r) + '<section class="card"><div class="eyebrow">Notes and recommendations</div><p>' + esc(r.notes) + '</p><p>' + esc(r.recs) + '</p><p class="small muted">' + esc(SCOPE_NOTE) + '</p></section>' +
+      pdfButton() + '<button class="btn primary" data-act="new-rep">Start a new report</button>';
+  }
+  h += '<div class="tabs" role="tablist">' + TABS.map(t => '<button role="tab" data-act="tab" data-tab="' + t[0] + '" aria-selected="' + (S.tab === t[0]) + '">' + t[1] + '</button>').join('') + '</div>';
+  if (S.tab === 'details'){
+    h += '<section class="card"><div class="eyebrow">Job</div>' + field('Customer', 'rep.customer') + field('Site address', 'rep.site') + '<div class="grid2">' + field('Date', 'rep.date', {type:'date'}) + field('Inspector', 'rep.inspector') + '</div></section>' +
+      '<section class="card"><div class="eyebrow">System</div><div class="grid2">' + field('System size', 'rep.sys.kw', {num:1, unit:'kW'}) + field('Panel count', 'rep.sys.panels', {num:1}) + '</div>' +
+      field('Panel make and model', 'rep.sys.panelModel') + '<div class="grid3">' + field('Panel power', 'rep.sys.panelW', {num:1, unit:'W'}) + field('Vmp', 'rep.sys.vmp', {num:1, unit:'V'}) + field('Voc', 'rep.sys.voc', {num:1, unit:'V'}) + '</div>' +
+      field('Inverter make and model', 'rep.sys.inverter') +
+      '<div class="field"><span class="label">Orientation</span>' + chips('rep.sys.orientation', ['N', 'NE', 'E', 'SE', 'S', 'SW', 'W', 'NW', 'Mixed']) + '</div>' + field('Tilt', 'rep.sys.tilt', {num:1, unit:'°'}) + '</section>';
+  } else if (S.tab === 'readings'){
+    h += '<section class="card"><div class="eyebrow">Conditions</div><div class="field"><span class="label">Weather</span>' + chips('rep.cond.weather', WEATHER) + '</div><div class="grid2">' + field('Irradiance', 'rep.cond.irr', {num:1, unit:'W/m²'}) + field('Ambient', 'rep.cond.ambient', {num:1, unit:'°C'}) + '</div>' +
+      '<details' + (r.cond.cellTemp || r.cond.gamma || r.cond.allowance ? ' open' : '') + '><summary class="small" style="cursor:pointer;color:var(--accent);font-weight:600">Optional corrections</summary><div class="stack" style="padding-top:10px"><div class="grid2">' + field('Cell temp', 'rep.cond.cellTemp', {num:1, unit:'°C'}) + field('Temp coeff.', 'rep.cond.gamma', {num:1, unit:'%/°C', ph:'-0.35'}) + field('Losses allowance', 'rep.cond.allowance', {num:1, unit:'%'}) + '</div><p class="small muted">Leave blank to compare against rated power × irradiance ÷ 1000 only.</p></div></details></section>';
+    h += r.strings.map((s, i) => '<section class="string"><div class="row between"><div class="eyebrow">String ' + (i + 1) + '</div>' + (r.strings.length > 1 ? '<button class="linkish small" data-act="del-string" data-i="' + i + '">Remove</button>' : '') + '</div>' +
+      '<div class="grid2">' + field('Label', 'rep.strings.' + i + '.name') + field('Panels in series', 'rep.strings.' + i + '.n', {num:1}) + '</div>' +
+      '<div class="field"><span class="label">Voltage</span>' + chips('rep.strings.' + i + '.vmode', [['measured', 'Measured'], ['rated', 'Rated Vmp (estimate)']]) + '</div>' +
+      '<div class="grid2">' + field('Current (DC clamp)', 'rep.strings.' + i + '.i', {num:1, unit:'A'}) + (s.vmode === 'rated' ? '<div class="field"><span class="label">Voltage</span><p class="small muted">Using panels × Vmp. Reported as an estimate.</p></div>' : field('Voltage', 'rep.strings.' + i + '.v', {num:1, unit:'V'})) + '</div>' +
+      '<div class="stack" data-live="str-' + i + '">' + stringLive(i) + '</div></section>').join('');
+    h += '<button class="btn" data-act="add-string">Add a string</button>';
+    h += '<section class="card"><div class="eyebrow">Array total</div><div class="stack" data-live="totals">' + totalsBlock(r) + '</div></section>';
+    h += '<section class="card"><div class="eyebrow">Inverter</div><div class="grid2">' + field('AC power shown', 'rep.inv.acW', {num:1, unit:'W'}) + field('Energy today', 'rep.inv.todayKwh', {num:1, unit:'kWh'}) + '</div>' + field('Status', 'rep.inv.status', {ph:'e.g. Running, no active faults'}) + field('Fault or event codes', 'rep.inv.codes') + '</section>';
+  } else if (S.tab === 'inspection'){
+    const left = TECH_ITEMS.filter(i => !(r.items[i.id] || {}).r).length;
+    h += '<div class="row between"><p class="muted small">' + (left ? left + ' of ' + TECH_ITEMS.length + ' still to check' : 'All ' + TECH_ITEMS.length + ' items checked') + '</p>' + (left ? '<button class="btn sm" data-act="mark-ok">Mark the rest OK</button>' : '') + '</div>';
+    h += TECH_GROUPS.map(g => '<section class="card"><div class="eyebrow">' + esc(g.name) + '</div><div>' + g.items.map(([id, label]) => {
+      const it = r.items[id] || {};
+      return '<div class="q"><h3>' + esc(label) + '</h3>' + chips('rep.items.' + id + '.r', [['ok', 'OK', 'c-ok'], ['issue', 'Issue', 'c-issue'], ['na', 'N/A', 'c-na']]) + (it.r === 'issue' ? field('What you saw', 'rep.items.' + id + '.note', {ph:'Location and detail'}) : '') + '</div>';
+    }).join('') + '</div></section>').join('');
+  } else if (S.tab === 'photos'){
+    h += '<section class="card"><div><div class="eyebrow">Photos</div><p class="muted small">Tap a tile to take or choose photos. They are added to the PDF report.</p></div>' + photoGrid(r.id, ['Before', 'After', 'Defect', 'Inverter'], true) + '</section>';
+  } else {
+    h += reportBody(r) + '<section class="card"><div class="eyebrow">Notes and recommendations</div>' + field('Notes', 'rep.notes', {type:'textarea'}) + field('Recommendations', 'rep.recs', {type:'textarea'}) + '<p class="small muted">' + esc(SCOPE_NOTE) + '</p></section>' +
+      pdfButton() + '<button class="btn" data-act="copy-rep">Copy text summary</button>' +
+      '<button class="btn danger" data-act="confirm-ask" data-key="del-rep">Delete this report</button>' + confirmBox('del-rep', 'Delete this report and its photos? This cannot be undone.', 'Delete report');
+  }
+  return h;
+};
+function pdfButton(){
+  if (!window.PDFLib) return '<p class="small muted">The PDF library did not load, so PDF export is off for this visit.</p>';
+  if (!S.downloads && FRAMED) return '<p class="small muted">PDF download is not available in this view. Open the app from your Claude account to save reports as PDF.</p>';
+  return '<button class="btn primary" data-act="pdf">Save report as PDF</button>';
+}
+function reportText(r){
+  const c = reportCalc(r), L = [];
+  L.push('Solar system health check, ' + fmtDate(r.date));
+  L.push([r.customer, r.site].filter(Boolean).join(', '));
+  L.push('System: ' + [r.sys.kw ? r.sys.kw + ' kW' : '', r.sys.panels ? r.sys.panels + ' panels' : '', r.sys.panelModel, r.sys.inverter].filter(Boolean).join(', '));
+  L.push('Conditions: ' + [r.cond.weather, r.cond.irr ? r.cond.irr + ' W/m2' : '', r.cond.ambient ? r.cond.ambient + ' C' : ''].filter(Boolean).join(', '));
+  c.rows.forEach(x => L.push('- ' + (x.s.name || 'String') + ': ' + fmtN(x.i, 1) + ' A x ' + fmtN(x.v, 1) + ' V' + (x.estimated ? ' (rated Vmp, estimated)' : '') + ' = ' + fmtN(x.watts) + ' W, ' + (x.pct !== null ? fmtN(x.pct) + '% of expected' : 'expected not available')));
+  if (c.pct !== null) L.push('Array: ' + fmtN(c.watts) + ' W measured against ' + fmtN(c.expected) + ' W expected (' + fmtN(c.pct) + '%)');
+  const iss = issueItems(r); if (iss.length){ L.push('Observations:'); iss.forEach(i => L.push('- ' + i.label + (i.note ? ': ' + i.note : ''))); }
+  if (r.recs) L.push('Recommendations: ' + r.recs);
+  L.push(SCOPE_NOTE);
+  return L.filter(Boolean).join('\n');
+}
+
+/* ----- PDF ----- */
+const pdfSafe = s => String(s === null || s === undefined ? '' : s).replace(/[‘’]/g, "'").replace(/[“”]/g, '"').replace(/[–—]/g, '-').replace(/≈/g, 'approx.').replace(/[^\x0a\x20-\x7e¡-ÿ]/g, ' ');
+async function makePdf(r){
+  const {PDFDocument, StandardFonts, rgb} = window.PDFLib;
+  const pdf = await PDFDocument.create();
+  const fReg = await pdf.embedFont(StandardFonts.Helvetica), fBold = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const K = 72 / 25.4, M = 16, W = 210, H = 297, CW = W - 2 * M;
+  let page = pdf.addPage([W * K, H * K]), y = M;
+  const col = a => rgb(a[0] / 255, a[1] / 255, a[2] / 255);
+  const INK = [13, 26, 43], MUTED = [85, 101, 122], LINE = [208, 217, 228], BLUE = [23, 70, 200], RED = [179, 38, 30];
+  const newPage = () => { page = pdf.addPage([W * K, H * K]); y = M; };
+  const need = h => { if (y + h > H - 16) newPage(); };
+  const widthMm = (txt, size, bold) => (bold ? fBold : fReg).widthOfTextAtSize(txt, size) / K;
+  const t = (txt, x, yy, o) => {
+    o = o || {}; const size = o.size || 10, s = pdfSafe(txt).replace(/\n/g, ' '); if (!s.trim()) return;
+    const w = widthMm(s, size, o.bold), xx = o.align === 'right' ? x - w : x;
+    page.drawText(s, {x:xx * K, y:(H - yy) * K, size, font:o.bold ? fBold : fReg, color:col(o.color || INK)});
+  };
+  const wrap = (txt, size, bold, width) => {
+    const out = [];
+    pdfSafe(txt).split('\n').forEach(par => {
+      let line = '';
+      par.split(/\s+/).filter(Boolean).forEach(word => {
+        const tryLine = line ? line + ' ' + word : word;
+        if (widthMm(tryLine, size, bold) <= width || !line) line = tryLine; else { out.push(line); line = word; }
+      });
+      out.push(line);
+    });
+    return out;
+  };
+  const fit = (txt, size, bold, width) => { let s = pdfSafe(txt).replace(/\n/g, ' '); if (widthMm(s, size, bold) <= width) return s; while (s.length > 1 && widthMm(s + '...', size, bold) > width) s = s.slice(0, -1); return s + '...'; };
+  const hline = (yy, c, th) => page.drawLine({start:{x:M * K, y:(H - yy) * K}, end:{x:(W - M) * K, y:(H - yy) * K}, thickness:th || 0.6, color:col(c || LINE)});
+  const para = (txt, o) => { o = o || {}; const size = o.size || 10, lh = size * 0.45; wrap(txt, size, o.bold, o.width || CW).forEach(l => { need(lh); t(l, o.x || M, y + lh * 0.75, o); y += lh; }); };
+  const section = title => { need(16); y += 4; t(title.toUpperCase(), M, y + 3.5, {bold:true, size:9, color:BLUE}); y += 5.5; hline(y, LINE, 0.8); y += 3; };
+
+  const inst = S.installer || {};
+  t(fit(inst.business || 'Solar system health check report', 15, true, CW - 62), M, y + 5, {bold:true, size:15});
+  const contact = [inst.contact, inst.phone, inst.email, inst.licence ? 'Licence ' + inst.licence : ''].filter(Boolean);
+  contact.forEach((c, i) => t(c, W - M, y + 3 + i * 4.2, {size:8.5, color:MUTED, align:'right'}));
+  y += Math.max(9, contact.length * 4.2 + 1);
+  if (inst.business){ t('Solar system health check report', M, y + 4, {size:11, color:MUTED}); y += 8; } else y += 2;
+  hline(y, INK, 1.6); y += 5;
+  const kv = pairs => { const colW = CW / 2; for (let i = 0; i < pairs.length; i += 2){ need(10); [pairs[i], pairs[i + 1]].forEach((p, k) => { if (!p) return; const x = M + k * colW; t(p[0].toUpperCase(), x, y + 3, {size:7, bold:true, color:MUTED}); t(fit(p[1] || '-', 10, false, colW - 4), x, y + 7.4, {size:10}); }); y += 10; } };
+  kv([['Customer', r.customer], ['Date', fmtDate(r.date)], ['Site', r.site], ['Inspector', r.inspector],
+    ['System size', r.sys.kw ? r.sys.kw + ' kW' : ''], ['Panels', [r.sys.panels, r.sys.panelModel].filter(Boolean).join(' x ')],
+    ['Panel rating', [r.sys.panelW ? r.sys.panelW + ' W' : '', r.sys.vmp ? 'Vmp ' + r.sys.vmp + ' V' : '', r.sys.voc ? 'Voc ' + r.sys.voc + ' V' : ''].filter(Boolean).join(', ')], ['Inverter', r.sys.inverter],
+    ['Orientation and tilt', [r.sys.orientation, r.sys.tilt ? r.sys.tilt + '°' : ''].filter(Boolean).join(', ')], ['Conditions', [r.cond.weather, r.cond.irr ? r.cond.irr + ' W/m²' : '', r.cond.ambient ? r.cond.ambient + ' °C ambient' : ''].filter(Boolean).join(', ')]]);
+  const c = reportCalc(r);
+  section('Performance');
+  const cols = [['String', 0, 'left'], ['Panels', 66, 'right'], ['Current A', 89, 'right'], ['Voltage V', 112, 'right'], ['DC power W', 136, 'right'], ['Expected W', 158, 'right'], ['% of exp.', CW, 'right']];
+  const rowOut = (cells, o) => { need(6.5); cells.forEach((v, i) => t(v, M + cols[i][1], y + 4.3, Object.assign({size:9, align:cols[i][2] === 'right' ? 'right' : undefined}, o || {}))); y += 6.2; hline(y, LINE, 0.5); };
+  rowOut(cols.map(x => x[0]), {bold:true, color:MUTED, size:8});
+  c.rows.forEach(x => rowOut([fit(x.s.name || 'String', 9, false, 50), fmtN(x.n), fmtN(x.i, 1), fmtN(x.v, 1) + (x.estimated && x.v !== null ? '*' : ''), fmtN(x.watts), fmtN(x.expected), x.pct !== null ? fmtN(x.pct) + '%' : '-']));
+  rowOut(['Array total', '', '', '', fmtN(c.watts), fmtN(c.expected), c.pct !== null ? fmtN(c.pct) + '%' : '-'], {bold:true});
+  y += 2;
+  if (c.pct !== null) para(pctWords(c.pct) + '.', {bold:true});
+  if (c.rows.some(x => x.estimated)) para('* Voltage taken from rated Vmp (panels in series x panel Vmp), not measured. Power for that string is an estimate.', {size:8.5, color:MUTED});
+  if (c.factor !== null) para('Expected output = rated string power x ' + fmtN(c.factor, 3) + ' (irradiance / 1000' + (num(r.cond.cellTemp) !== null && num(r.cond.gamma) !== null ? ', cell temperature correction' : '') + (num(r.cond.allowance) !== null ? ', ' + r.cond.allowance + '% losses allowance' : '') + ').', {size:8.5, color:MUTED});
+  const invLine = [r.inv.acW ? 'AC power shown ' + r.inv.acW + ' W' : '', r.inv.todayKwh ? r.inv.todayKwh + ' kWh today' : '', r.inv.status, r.inv.codes ? 'Codes: ' + r.inv.codes : ''].filter(Boolean).join('. ');
+  if (invLine){ y += 1.5; para('Inverter: ' + invLine + '.'); }
+  section('Visual inspection');
+  TECH_GROUPS.forEach(g => {
+    g.items.forEach(([id, label]) => {
+      const it = r.items[id] || {}; const res = it.r === 'ok' ? 'OK' : it.r === 'issue' ? 'ISSUE' : it.r === 'na' ? 'N/A' : 'Not checked';
+      const noteLines = it.r === 'issue' && it.note ? wrap(it.note, 8.5, false, CW - 8) : [];
+      need(6.5 + noteLines.length * 4);
+      t(label, M, y + 4, {size:9.5}); t(res, W - M, y + 4, {size:9, bold:it.r === 'issue', color:it.r === 'issue' ? RED : it.r ? INK : MUTED, align:'right'}); y += 5.6;
+      noteLines.forEach(l => { t(l, M + 4, y + 3, {size:8.5, color:MUTED}); y += 4; });
+      if (noteLines.length) y += 1;
+      hline(y, LINE, 0.5);
+    });
+  });
+  if (r.notes){ section('Notes'); para(r.notes); }
+  if (r.recs){ section('Recommendations'); para(r.recs); }
+  need(34); section('Scope of this check'); para(SCOPE_NOTE, {size:8.5, color:MUTED});
+  const photos = (S.photos[r.id] || []).filter(p => /^data:image\/jpeg/.test(p.data));
+  if (photos.length){
+    if (y > 150) newPage(); section('Photos');
+    const pw = (CW - 6) / 2; let k = 0, rowH = 0;
+    for (const p of photos){
+      let img; try{ img = await pdf.embedJpg(p.data); }catch(e){ continue; }
+      const ph = Math.min(pw * 1.34, pw * img.height / img.width), w = ph * img.width / img.height;
+      if (k === 0 && y + ph + 8 > H - 16) newPage();
+      const x = M + k * (pw + 6);
+      page.drawImage(img, {x:x * K, y:(H - y - ph) * K, width:w * K, height:ph * K});
+      t(p.kind, x, y + ph + 4, {size:8, bold:true, color:MUTED});
+      rowH = Math.max(rowH, ph + 8);
+      if (k === 1){ y += rowH; rowH = 0; k = 0; } else k = 1;
+    }
+  }
+  const pages = pdf.getPages();
+  pages.forEach((pg, i) => { page = pg; t(fit([r.customer, fmtDate(r.date)].filter(Boolean).join(' - '), 8, false, CW - 30), M, H - 8, {size:8, color:MUTED}); t('Page ' + (i + 1) + ' of ' + pages.length, W - M, H - 8, {size:8, color:MUTED, align:'right'}); });
+  return pdf.save();
+}
+async function savePdf(){
+  const r = S.rep; if (!r) return;
+  try{
+    if (!r.example) await loadPhotos(r.id);
+    const bytes = await makePdf(r);
+    const name = 'health-check-' + (String(r.customer || 'report').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '') || 'report') + '-' + r.date + '.pdf';
+    const how = await deliverPdf(bytes, name);
+    if (how === 'saved') toast('Report saved as PDF');
+  }catch(e){
+    if (e && e.code === 'declined') return;
+    console.error(e);
+    toast(e && e.code === 'rate_limited' ? 'A save prompt is already open. Answer it, then try again.' : 'The PDF could not be saved in this view.');
+  }
+}
+async function deliverPdf(bytes, name){
+  const blob = new Blob([bytes], {type:'application/pdf'});
+  if (S.downloads){ await S.downloads.save({filename:name, data:blob}); return 'saved'; }
+  // hosted outside Claude: phones get the share sheet (save to Files, email, message), computers get a download
+  if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent) && navigator.canShare){
+    try{
+      const file = new File([blob], name, {type:'application/pdf'});
+      if (navigator.canShare({files:[file]})){ await navigator.share({files:[file], title:name}); return 'shared'; }
+    }catch(e){ if (e && e.name === 'AbortError') return 'cancelled'; }
+  }
+  const url = URL.createObjectURL(blob), a = document.createElement('a');
+  a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove();
+  setTimeout(() => URL.revokeObjectURL(url), 60000);
+  return 'saved';
+}
+
+/* ---------- render, events, boot ---------- */
+function render(){
+  $('#mode-home').setAttribute('aria-pressed', S.mode === 'home');
+  $('#mode-tech').setAttribute('aria-pressed', S.mode === 'tech');
+  const main = $('#view');
+  if (S.loading){ main.innerHTML = '<div class="card"><p class="muted">Loading your saved checks…</p></div>'; return; }
+  main.innerHTML = (views[S.view] || views['h-home'])();
+  if (S.view === 'h-result' && S.system) loadPhotos(S.openId);
+  if (S.view === 'h-check' && S.draft) loadPhotos(S.draft.id);
+  if (S.view === 't-edit' && S.rep && !S.rep.example) loadPhotos(S.rep.id);
+}
+function go(view){ S.view = view; S.confirm = null; render(); window.scrollTo(0, 0); }
+async function leaveReport(){ if (saveTimer) await saveRep(); }
+
+const acts = {
+  async mode(el){ await leaveReport(); S.mode = el.dataset.mode; try{ localStorage.setItem('shc-mode', S.mode); }catch(e){} go(S.mode === 'tech' ? 't-home' : 'h-home'); },
+  async go(el){ await leaveReport(); if (el.dataset.view === 'h-setup') S.sysDraft = null; go(el.dataset.view); },
+  set(el){
+    const cur = getPath(el.dataset.path), val = el.dataset.val;
+    setPath(el.dataset.path, String(cur) === val ? '' : val);
+    render(); if (S.view === 't-edit') scheduleSave();
+  },
+  copy(el){ copyText(el.dataset.text, el.dataset.ok || 'Copied'); },
+  tip(el){ S.tipIdx = +el.dataset.i; render(); },
+  'start-check'(){
+    if (!S.system){ S.sysDraft = null; S.afterSetup = true; toast('First, a few details about your system'); return go('h-setup'); }
+    if (!S.draft){ S.draft = newCheck(); S.step = 0; }
+    go('h-check');
+  },
+  step(el){ S.step = Math.max(0, Math.min(CHECK_STEPS.length - 1, S.step + (+el.dataset.d))); go('h-check'); },
+  async 'finish-check'(){
+    const c = S.draft; if (!c) return;
+    if (!c.date) c.date = todayISO();
+    S.checks.push(c); S.draft = null; S.openId = c.id; S.tipIdx = null;
+    go('h-result');
+    await store.put('checks', c);
+  },
+  async 'save-system'(){
+    const d = S.sysDraft; d.id = 'system'; d.months = +d.months === 4 ? 4 : 3;
+    S.system = d; S.sysDraft = null;
+    await store.put('profile', d);
+    toast('System saved');
+    if (S.afterSetup){ S.afterSetup = false; S.draft = newCheck(); S.step = 0; return go('h-check'); }
+    go('h-home');
+  },
+  'open-check'(el){ S.openId = el.dataset.id; go('h-result'); },
+  'save-installer'(){ saveInstaller(); },
+  'new-rep'(){ S.rep = newReport(); S.tab = 'details'; go('t-edit'); },
+  'open-rep'(el){
+    const r = el.dataset.id === 'example' ? demoReport() : S.reports.find(x => x.id === el.dataset.id);
+    if (!r) return; S.rep = r; S.tab = 'summary'; go('t-edit');
+  },
+  async 'close-rep'(){ await leaveReport(); S.rep = null; go('t-home'); },
+  async tab(el){ S.tab = el.dataset.tab; S.confirm = null; render(); },
+  'add-string'(){ const r = S.rep; r.strings.push({id:uid(), name:'String ' + (r.strings.length + 1), n:r.strings[r.strings.length - 1].n || '', i:'', v:'', vmode:'measured'}); render(); scheduleSave(); },
+  'del-string'(el){ S.rep.strings.splice(+el.dataset.i, 1); render(); scheduleSave(); },
+  'mark-ok'(){ TECH_ITEMS.forEach(i => { if (!(S.rep.items[i.id] || {}).r) S.rep.items[i.id] = {r:'ok', note:''}; }); render(); scheduleSave(); },
+  pdf(){ savePdf(); },
+  'copy-rep'(){ copyText(reportText(S.rep), 'Summary copied'); },
+  'photo-del'(el){ removePhoto(el.dataset.parent, el.dataset.id); },
+  'confirm-ask'(el){ S.confirm = el.dataset.key; render(); },
+  'confirm-no'(){ S.confirm = null; render(); },
+  async 'confirm-yes'(el){
+    const k = el.dataset.key; S.confirm = null;
+    if (k === 'discard' && S.draft){
+      const id = S.draft.id; S.draft = null; go('h-home');
+      for (const p of (S.photos[id] || [])) await store.del('photos', p.id);
+      delete S.photos[id];
+    } else if (k === 'del-check'){
+      const id = S.openId; S.checks = S.checks.filter(c => c.id !== id); go('h-home');
+      await store.del('checks', id);
+      for (const p of await store.photosFor(id)) await store.del('photos', p.id);
+      toast('Check deleted');
+    } else if (k === 'del-rep' && S.rep){
+      const id = S.rep.id; clearTimeout(saveTimer); saveTimer = null;
+      S.reports = S.reports.filter(r => r.id !== id); S.rep = null; go('t-home');
+      await store.del('reports', id);
+      for (const p of await store.photosFor(id)) await store.del('photos', p.id);
+      toast('Report deleted');
+    }
+  }
+};
+document.addEventListener('click', e => {
+  const el = e.target.closest('[data-act]'); if (!el) return;
+  const fn = acts[el.dataset.act]; if (fn) Promise.resolve(fn(el)).catch(err => { console.error(err); toast('Something went wrong. Your earlier entries are still saved.'); });
+});
+document.addEventListener('input', e => {
+  const el = e.target; if (!el.dataset || !el.dataset.bind) return;
+  setPath(el.dataset.bind, el.value);
+  if (S.view === 't-edit'){ refreshLive(); scheduleSave(); }
+});
+document.addEventListener('change', e => {
+  const el = e.target;
+  if (el.dataset && el.dataset.photo && el.files && el.files.length){
+    const files = [...el.files]; el.value = '';
+    if (S.view === 't-edit' && S.rep && S.rep.isNew) saveRep();
+    addPhotos(el.dataset.parent, el.dataset.photo, files);
+  }
+});
+document.addEventListener('visibilitychange', () => { if (document.hidden && saveTimer) saveRep(); });
+
+async function start(prev){
+  prev = prev || {};
+  try{ const m = localStorage.getItem('shc-mode'); if (m === 'tech' || m === 'home') S.mode = m; }catch(e){}
+  if (prev.mode) ['mode', 'view', 'draft', 'step', 'rep', 'tab', 'openId'].forEach(k => { if (prev[k] !== undefined) S[k] = prev[k]; });
+  else S.view = S.mode === 'tech' ? 't-home' : 'h-home';
+  setBackendNote();
+  await local.open();
+  if (CONFIG.installer) S.installer = Object.assign({}, CONFIG.installer);
+  const li = await local.get('config/installer'); if (li) S.installer = li;
+  await loadAll();
+  // show local data straight away unless a viewer is about to hand over the account store
+  const framed = FRAMED;
+  let shown = false;
+  const show = () => { if (!shown){ shown = true; S.loading = false; render(); } };
+  if (!framed) show(); else setTimeout(show, 3500);
+  if (framed){
+    try{ await connectCloud(); if (cloud.ok) await loadAll(); }catch(e){}
+    setBackendNote();
+    const ae = document.activeElement; const busy = shown && ae && /^(INPUT|TEXTAREA|SELECT)$/.test(ae.tagName);
+    shown = true; S.loading = false;
+    if (!busy) render();
+  }
+}
+try{ if (window.claude && window.claude.hot && window.claude.hot.snapshot) window.claude.hot.snapshot(() => ({mode:S.mode, view:S.view, draft:S.draft, step:S.step, rep:S.rep, tab:S.tab, openId:S.openId})); }catch(e){}
+if (window.claude && window.claude.hot && window.claude.hot.ready) window.claude.hot.ready(start);
+else start((window.claude && window.claude.hot && window.claude.hot.data) || {});
+if (CONFIG.offline && 'serviceWorker' in navigator && (location.protocol === 'https:' || location.hostname === 'localhost')) navigator.serviceWorker.register('sw.js').catch(() => {});
+
+</script>
+</body>
+</html>
